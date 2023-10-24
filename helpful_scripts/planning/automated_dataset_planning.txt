@@ -1,0 +1,40 @@
+Automate the Image Labeling
+
+Sources:
+    YOLOv5 Label File Format:
+        https://wandb.ai/onlineinference/YOLO/reports/Collect-and-Label-Images-to-Train-a-YOLOv5-Object-Detection-Model-in-PyTorch--VmlldzoxMzQxODc3#labeling-data-using-labeling-tools
+
+
+What's required for an image label (YOLOv5)
+    - Bounding box
+    - label
+
+Info:
+    - CoDroneEDU (height -> 35mm; width -> 138mm)
+        - w:h ~= 3.943
+        
+
+
+Program:
+    - Command-line parsing
+        - Desired File Name Prefix
+        - Output Directory
+        - (optional) Desired num of leading zeros.
+        - (optional) ArUCO tag dictionary
+    - Capture images via camera
+    - Analyze each image for the ArUCo tag. 
+    - Associate ArUCo tag with some depth based on tag area (?)
+        - Nope. Try associating width of bounding box with height of tag (because height of small tag is ~1:1 with height of drone)
+    - Draw requisite bounding box (for testing)
+        - Calculate center of detection
+        - Calculate requisite width from height
+        - Calculate bounding box points
+        - Draw BBox onto image and display.
+    - File Operations
+        - Check to see if file exists in directory already; Modify output file name prefix as a result.
+        - Generate file names (JPG and TXT)
+        - Generate label .txt file
+            - Format: <Class index> <center-x> <center-y> <width of bounding box> <height of bounding box>
+                - Only include the numbers; no '<>'
+                - Coordinates and dimensions are normalized between 0 and 1 as percentages of image dimensions.
+    
