@@ -1,0 +1,1 @@
+numpy_msgs/ROSNumpy_Int64[] rosnp_list
