@@ -1,0 +1,1 @@
+numpy_msgs/ROSNumpy_Int8[] rosnp_list
