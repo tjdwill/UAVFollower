@@ -1,0 +1,8 @@
+topics:
+    img_topic: "RGBHub"
+    detections: "detections"
+    resume_trigger: "resume_trigger"
+
+frame_data:
+    HEIGHT: 480
+    WIDTH: 640
