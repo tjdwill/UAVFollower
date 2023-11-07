@@ -1,8 +1,26 @@
+detect_thresh: 7
+
 topics:
     img_topic: "RGBHub"
     detections: "detections"
     resume_trigger: "resume_trigger"
+    depth_req: "depth_req"
+    waypoints: "clicked_point"
 
 frame_data:
     HEIGHT: 480
     WIDTH: 640
+
+ss02_Detector:
+# Define the private parameters for ss02.
+    yolo: {
+        "yolo": "/home/hiwonder/yolov5",
+        "weights": "/home/hiwonder/yolov5/weights/drone_weights.pt",
+        "conf": 0.35
+    }
+    seek_thresh: 7.  # seconds
+
+ss03_DataProcessor:
+    debug: False
+    density_thresh: 1.5
+    max_accel: 5

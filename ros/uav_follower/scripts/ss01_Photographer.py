@@ -21,7 +21,8 @@ def send_imgs():
     rate = rospy.Rate(FPS)
     
     pub = rospy.Publisher(pub_topic, ROSNumpy_UInt16, queue_size=QUEUE_MAX)
-
+    rospy.loginfo("Online.")
+    
     # OpenCV
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, IMG_HEIGHT)

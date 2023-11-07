@@ -36,7 +36,7 @@ class UAVDetector:
         self.topics: dict = rospy.get_param('topics')
         self.img_info: dict  = rospy.get_param('frame_data')
         self.yolo: dict  = rospy.get_param('~yolo', default=yolo_defaults)
-        self.DETECT_THRESH: int = rospy.get_param('~detect_thresh', default=5)
+        self.DETECT_THRESH: int = rospy.get_param('detect_thresh', default=7)
         self.SEEK_THRESH: float = rospy.get_param('~seek_thresh', default=7.)  
         self.IMG_HEIGHT: int = self.img_info['HEIGHT']
         self.IMG_WIDTH: int = self.img_info['WIDTH']
@@ -74,6 +74,7 @@ class UAVDetector:
         self.detections = 0
         self.collecting = True  # whether to collect UAV detections or not
 
+        rospy.loginfo("Online.")
         rospy.spin()
     
     def box_display(self, frame: np.ndarray, xyxyn: torch.Tensor) -> bool:
