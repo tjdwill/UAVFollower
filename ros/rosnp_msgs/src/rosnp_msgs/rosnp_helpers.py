@@ -8,7 +8,15 @@ of ROSNumpy-type messages.
 
 from typing import List
 import numpy as np
-from rosnumpy_msgs.msg import *
+from rosnp_msgs.msg import (
+        ROSNumpy_Int8, ROSNumpy_Int16, ROSNumpy_Int32, ROSNumpy_Int64,
+        ROSNumpy_UInt8, ROSNumpy_UInt16, ROSNumpy_UInt32, ROSNumpy_UInt64,
+        ROSNumpy_Float32, ROSNumpy_Float64, ROSNumpyList_Int8,
+        ROSNumpyList_Int16, ROSNumpyList_Int32, ROSNumpyList_Int64,
+        ROSNumpyList_UInt8, ROSNumpyList_UInt16, ROSNumpyList_UInt32,
+        ROSNumpyList_UInt64, ROSNumpyList_Float32, ROSNumpyList_Float64
+)
+
 
 rosnp_dict = {
     'int8': ROSNumpy_Int8,
@@ -52,7 +60,7 @@ def encode_rosnp(array: np.ndarray):
     """
 
     if not isinstance(array, np.ndarray):
-        raise ValueError("[rosnp_helpers.encode_rosnp] Input is not a Numpy array.")
+        raise ValueError("<rosnp_helpers.encode_rosnp> Input is not a Numpy array.")
     
     shape = array.shape
     dtype = array.dtype.name

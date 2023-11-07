@@ -1,1 +1,0 @@
-numpy_msgs/ROSNumpy_UInt8[] rosnp_list
