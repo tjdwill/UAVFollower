@@ -14,11 +14,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import rospy
 from rosnp_msgs.msg import ROSNumpyList_Float32, ROSNumpyList_UInt16
-from rosnp_msgs.helpers import decode_rosnp_list
+from rosnp_msgs.rosnp_helpers import decode_rosnp_list
 from std_msgs.msg import Header
 from geometry_msgs.msg import Point, PointStamped
-from uav_follower.src.kmeans import KMeans
-
+from uav_follower.kmeans import KMeans
+from uav_follower.srv import DepthImgReq
 
 class DataProcessor:
     def __init__(self):
@@ -53,7 +53,8 @@ class DataProcessor:
         )
 
         rospy.loginfo("Online.")
-
+        rospy.spin()
+        
     def process_detections(
             self,
             xyxyn_container: ROSNumpyList_Float32,
@@ -359,7 +360,7 @@ class DataProcessor:
             # Return point in (x, y) form
             return winner[::-1]
     
-    def pointstamped_from_imgcoord(img_coordinates: np.ndarray):
+    def pointstamped_from_imgcoord(self, img_coordinates: np.ndarray):
         """
         Generate a PointStamped message from [x,y] coordinates
         
@@ -368,6 +369,33 @@ class DataProcessor:
             2. Back project depth region and (x, y) into proper coord frame. 
             3. Create and return PointStamped message of the waypoint
         """
+        x_index, y_index = img_coordinates
+        
+        num_imgs: int = 3
+        depth_imgs = self.depth_req(DepthImgReq(amount=num_imgs))
+        depth_imgs = decode_rosnp_list(depth_imgs)
+        assert num_imgs == len(depth_imgs)
+        dtype = depth_imgs[0].dtype
+
+        # Average the depth images
+        avg_depth_img = depth_imgs[0]
+        for i in range(1, num_imgs):
+            avg_depth_img = avg_depth_img + depth_imgs[i]
+        else:
+            avg_depth_img = (avg_depth_img / num_imgs).astype(dtype)
+
+        # Select point region and average to get the average Z val
+        pad = 1
+        try:
+            region = avg_depth_img[
+                (y_index - pad):(y_index + (pad + 1)),
+                (x_index - pad):(x_index + pad + 1)
+            ]
+            Z_avg = np.average(region).astype(np.uint16)
+        except IndexError:
+            Z_avg = avg_depth_img[y_index, x_index]
+            print(Z_avg)
+        # Craft output message
         header = Header(
             frame_id='map',
             stamp=rospy.Time.now()

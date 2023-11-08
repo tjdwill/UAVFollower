@@ -4,23 +4,23 @@
 import cv2
 import numpy as np
 import rospy
-from rosnp_msgs.msg import ROSNumpy_UInt16
-from rosnp_msgs.helpers import encode_rosnp
+from rosnp_msgs.msg import ROSNumpy_UInt8
+from rosnp_msgs.rosnp_helpers import encode_rosnp
 
 
 def send_imgs():
     # ROS Setup
-    rospy.init('ss01_Photographer', anonymous=False, log_level=rospy.INFO)
+    rospy.init_node('ss01_Photographer', anonymous=False, log_level=rospy.INFO)
 
     QUEUE_MAX = 5
-    FPS = 30
+    FPS = 15
     img_data = rospy.get_param('frame_data')
     IMG_HEIGHT = img_data['HEIGHT']
     IMG_WIDTH = img_data['WIDTH']
     pub_topic = rospy.get_param('topics/img_topic', default='RGBHub')
     rate = rospy.Rate(FPS)
     
-    pub = rospy.Publisher(pub_topic, ROSNumpy_UInt16, queue_size=QUEUE_MAX)
+    pub = rospy.Publisher(pub_topic, ROSNumpy_UInt8, queue_size=QUEUE_MAX)
     rospy.loginfo("Online.")
     
     # OpenCV

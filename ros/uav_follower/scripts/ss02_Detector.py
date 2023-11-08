@@ -15,14 +15,14 @@ import cv2
 import numpy as np
 import torch
 import rospy
-from rosnp_msgs.msg import ROSNumpy_UInt16, ROSNumpyList_Float32
-from rosnp_msgs.helpers import decode_rosnp, encode_rosnp_list
+from rosnp_msgs.msg import ROSNumpy_UInt8, ROSNumpy_UInt16, ROSNumpyList_Float32
+from rosnp_msgs.rosnp_helpers import decode_rosnp, encode_rosnp_list
 from std_srvs.srv import Empty
 
 
 yolo_defaults = {
     'yolo': '/home/hiwonder/yolov5',
-    'weights': '/home/hiwonder/yolov5/weights/drone_weights.pt',
+    'weights': '/home/hiwonder/yolov5/weights/20231101_drone_weights.pt',
     'conf': 0.35
 }
 
@@ -42,22 +42,6 @@ class UAVDetector:
         self.IMG_WIDTH: int = self.img_info['WIDTH']
         self.window_name = 'JetHexa Live Feed'
 
-        # Define ROS Communications
-        self.detections_pub = rospy.Publisher(
-            self.topics['detections'],
-            ROSNumpyList_Float32,
-            queue=1
-        )
-        self.rgb_sub = rospy.Subscriber(
-            self.topics['img_topic'],
-            ROSNumpy_UInt16
-        )
-        self.srv = rospy.Service(
-            self.topics['resume_trigger'],
-            Empty,
-            self.resume
-        )
-
         # Machine Learning Setup
         self.CONF: float = self.yolo['conf']
         self.model = torch.hub.load(
@@ -73,6 +57,23 @@ class UAVDetector:
         self.container = []
         self.detections = 0
         self.collecting = True  # whether to collect UAV detections or not
+        
+        # Define ROS Communications
+        self.detections_pub = rospy.Publisher(
+            self.topics['detections'],
+            ROSNumpyList_Float32,
+            queue_size=1
+        )
+        self.rgb_sub = rospy.Subscriber(
+            self.topics['img_topic'],
+            ROSNumpy_UInt8,
+            self.img_callback
+        )
+        self.srv = rospy.Service(
+            self.topics['resume_trigger'],
+            Empty,
+            self.resume
+        )
 
         rospy.loginfo("Online.")
         rospy.spin()
@@ -150,6 +151,7 @@ class UAVDetector:
         self.model.to(self.device)  # Does this need to be called every loop iteration?
         inference = self.model(rgb, size=640)
         tensor = inference.xyxyn[0]
+        tensor = tensor.cpu()
 
         # Detection logic
         if not self.box_display(rgb, tensor):
@@ -167,8 +169,10 @@ class UAVDetector:
                     self.detections_pub.publish(rosnp_list_msg)
                     self.container.clear()
                     self.detections = 0
-                    self.collecting = False
+                    # self.collecting = False
 
+    def __del__(self):
+        cv2.destroyAllWindows()
 if __name__ == '__main__':
     try:
         ss02 = UAVDetector()
