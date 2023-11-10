@@ -66,8 +66,10 @@ def encode_rosnp(array: np.ndarray):
     dtype = array.dtype.name
     # correct ROS' uint8[] -> bytes serialization 
     # All other numeric-typed arrays
-    # are serialized as tuples anyway, so just cast it.
-    rosnp = tuple(array.flatten())
+    # are serialized as tuples.
+    rosnp = array.flatten()
+    if dtype == 'uint8':
+        rosnp = rosnp.tobytes()
     
     # Select the message class and instantiate an object.
     try:
@@ -149,8 +151,11 @@ def decode_rosnp(msg):
             print(msg_type)
         raise TypeError   
     
-    shape, dtype, data = msg.shape, msg.dtype, tuple(msg.rosnp)
-    result_array = np.array(data, dtype=dtype).reshape(shape)
+    shape, dtype, data = msg.shape, msg.dtype, msg.rosnp
+    if dtype == 'uint8':
+        result_array = np.ndarray(shape, dtype=dtype, buffer=data)
+    else:
+        result_array = np.array(data, dtype=dtype).reshape(shape)
     
     return result_array
 
