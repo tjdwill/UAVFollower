@@ -1,8 +1,6 @@
 <?xml version="1.0" ?>
 
 <launch>
-	<rosparam command="load" file="$(find uav_follower)/config/uav_follower_params.yaml" />
-
 	<group ns="uav_follower">
 		<rosparam command="load" file="$(find uav_follower)/config/uav_follower_params.yaml" />
 		<node name="ss00_Liaison" pkg="uav_follower" type="ss00_Liaison.py" output="screen" required="true"></node>

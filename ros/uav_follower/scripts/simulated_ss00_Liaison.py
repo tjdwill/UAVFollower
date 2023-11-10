@@ -2,10 +2,13 @@
 # -*-coding: utf-8-*-
 """
 @author: Terrance Williams
-@date: 7 November 2023
+@date: 8 November 2023
 @description:
-    This program defines the node for coordinating communication
-    for other subsystem nodes.
+    This program defines the node for simulating ss00_Liaison
+    for testing purposes.
+
+    May write a version that doesn't use the depth camera but instead
+    simulates those images as well.
 """
 
 
@@ -15,17 +18,23 @@ from rosnp_msgs.rosnp_helpers import encode_rosnp_list
 from std_srvs.srv import Empty, EmptyResponse
 from sensor_msgs.msg import Image
 from uav_follower.srv import DepthImgReq, DepthImgReqResponse
+from geometry_msgs.msg import PointStamped
+
 
 class NodeLiaison:
     def __init__(self) -> None:
         rospy.init_node('ss00_Liaison', log_level=rospy.INFO)
-
         self.name = rospy.get_name()
+        self.collect = False
+        self.imgs = []
+        self.amount = -1
+
         topics = rospy.get_param('topics')
         self.depth_req = rospy.Service(
             topics['depth_req'],
             DepthImgReq,
-            self.depth_callback)
+            self.depth_callback
+        )
         self.resume_trigger = rospy.ServiceProxy(
             topics['resume_trigger'],
             Empty
@@ -35,21 +44,21 @@ class NodeLiaison:
             Image,
             self.depth_img_handler
         )
+        self.waypoint_sub = rospy.Subscriber(
+            topics['waypoints'],
+            PointStamped,
+            self.waypoint_callback
+        )
+        
         self.bad_detection = rospy.Service(
             topics['bad_detections'],
             Empty,
-            self.bad_detect_action
+            self.bad_detection_action
         )
-
-        self.collect = False
-        self.imgs = []
-        self.amount = -1
-
         rospy.loginfo(f'{self.name}: Online')
         rospy.spin()
     
-    def bad_detect_action(self, req):
-        """Send resume signal to ss02 """
+    def bad_detection_action(self, req):
         self.resume_trigger()
         return EmptyResponse()
 
@@ -82,9 +91,13 @@ class NodeLiaison:
     def send_resume_signal(self):
         self.resume_trigger()
 
+    def waypoint_callback(self, msg):
+        print(f"ss00:\n{msg}")
+        self.send_resume_signal()
 
 if __name__ == '__main__':
     try:
         NodeLiaison()
     except rospy.ROSInterruptException:
         pass
+

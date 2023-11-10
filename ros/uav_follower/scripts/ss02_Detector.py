@@ -17,7 +17,7 @@ import torch
 import rospy
 from rosnp_msgs.msg import ROSNumpy_UInt8, ROSNumpy_UInt16, ROSNumpyList_Float32
 from rosnp_msgs.rosnp_helpers import decode_rosnp, encode_rosnp_list
-from std_srvs.srv import Empty
+from std_srvs.srv import Empty, EmptyResponse
 
 
 yolo_defaults = {
@@ -26,6 +26,8 @@ yolo_defaults = {
     'conf': 0.35
 }
 
+BUFF_SZ = 2**24  # mebibytes
+SUB_QUEUE_SZ = 1
 class UAVDetector:
     """A class for running a YOLOv5 UAV Detection algorithm"""
     
@@ -33,6 +35,7 @@ class UAVDetector:
         rospy.init_node('ss02_Detector', log_level=rospy.INFO)
         
         # Get parameters
+        self.name = rospy.get_name()
         self.topics: dict = rospy.get_param('topics')
         self.img_info: dict  = rospy.get_param('frame_data')
         self.yolo: dict  = rospy.get_param('~yolo', default=yolo_defaults)
@@ -40,8 +43,9 @@ class UAVDetector:
         self.SEEK_THRESH: float = rospy.get_param('~seek_thresh', default=7.)  
         self.IMG_HEIGHT: int = self.img_info['HEIGHT']
         self.IMG_WIDTH: int = self.img_info['WIDTH']
+        self.testing = rospy.get_param('~testing', default=False)
         self.window_name = 'JetHexa Live Feed'
-
+        
         # Machine Learning Setup
         self.CONF: float = self.yolo['conf']
         self.model = torch.hub.load(
@@ -67,15 +71,17 @@ class UAVDetector:
         self.rgb_sub = rospy.Subscriber(
             self.topics['img_topic'],
             ROSNumpy_UInt8,
-            self.img_callback
+            self.img_callback,
+            queue_size=SUB_QUEUE_SZ,
+            buff_size=BUFF_SZ
         )
         self.srv = rospy.Service(
             self.topics['resume_trigger'],
             Empty,
             self.resume
         )
-
-        rospy.loginfo("Online.")
+        
+        rospy.loginfo(f"{self.name}: Online.")
         rospy.spin()
     
     def box_display(self, frame: np.ndarray, xyxyn: torch.Tensor) -> bool:
@@ -102,6 +108,7 @@ class UAVDetector:
         font_color = (255, 0, 255)
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 1.05
+        font_thickness = 4
 
         # Loop through all inference matrix rows
         for detection in xyxyn:
@@ -119,22 +126,23 @@ class UAVDetector:
                 if x2 > (5 * self.IMG_WIDTH) // 6:
                     cv2.putText(
                         frame, f'{conf}',(x1, y1 - 10),
-                        font, font_scale, font_color
+                        font, font_scale, font_color, thickness=font_thickness
                     )
                 else:
                     cv2.putText(
                         frame, f'{conf}', (x2, y1 - 10),
-                        font, font_scale, font_color
+                        font, font_scale, font_color, thickness=font_thickness
                     )
         else:
-            cv2.imshow(self.window_name, frame[..., ::-1])  # flip to BGR
+            # flip to BGR
+            cv2.imshow(self.window_name, frame[..., ::-1].astype(np.uint8)) 
             cv2.waitKey(1)
         return detected
     
     def resume(self, req: Empty):
         self.collecting = True
-        # Is passing the same message back a valid action?
-        return req
+
+        return EmptyResponse() 
     
     def request_seeker(self):
         ...
@@ -145,6 +153,7 @@ class UAVDetector:
         collects them, and sends to the designated topic when the consecutive 
         detection threshold is reached.
         """
+        start = rospy.get_time()
         rgb = decode_rosnp(msg)
 
         # Run inference
@@ -152,9 +161,11 @@ class UAVDetector:
         inference = self.model(rgb, size=640)
         tensor = inference.xyxyn[0]
         tensor = tensor.cpu()
-
+        
+        detected = self.box_display(rgb, tensor)
+        print(f'{self.name}: Time Elapsed: {rospy.get_time() - start}')
         # Detection logic
-        if not self.box_display(rgb, tensor):
+        if not detected:
             self.container.clear()
             self.detections = 0
             """
@@ -169,7 +180,9 @@ class UAVDetector:
                     self.detections_pub.publish(rosnp_list_msg)
                     self.container.clear()
                     self.detections = 0
-                    # self.collecting = False
+                    # Halt data collection until signal if *not* in testing mode
+                    if not self.testing:
+                        self.collecting = False
 
     def __del__(self):
         cv2.destroyAllWindows()
@@ -178,3 +191,4 @@ if __name__ == '__main__':
         ss02 = UAVDetector()
     except rospy.ROSInterruptException:
         pass
+

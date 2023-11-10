@@ -6,6 +6,7 @@ topics:
     resume_trigger: "resume_trigger"
     depth_req: "depth_req"
     waypoints: "clicked_point"
+    bad_detections: "bad_detections"
 
 frame_data:
     HEIGHT: 480
@@ -19,6 +20,7 @@ ss02_Detector:
         "conf": 0.35
     }
     seek_thresh: 7.  # seconds
+    testing: False
 
 ss03_DataProcessor:
     debug: False

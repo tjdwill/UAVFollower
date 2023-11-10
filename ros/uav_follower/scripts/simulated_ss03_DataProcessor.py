@@ -2,10 +2,11 @@
 # -*-coding: utf-8-*-
 """
 @author: Terrance Williams
-@date: 7 November 2023
+@date: 8 November 2023
 @description:
-    This program defines the node for the Data Processor that processes
-    bounding boxes, calculates centers, performs k-means clustering and more.
+    This program defines a test version of the ss03_DataProcessor node.
+    Comment out various aspects of the detection callback function
+    to test each method's functionality.
 """
 
 
@@ -21,6 +22,7 @@ from uav_follower.kmeans import KMeans
 from uav_follower.srv import DepthImgReq
 from std_srvs.srv import Empty
 
+
 class DataProcessor:
     def __init__(self):
         rospy.init_node('ss03_DataProcessor', log_level=rospy.INFO)
@@ -34,7 +36,7 @@ class DataProcessor:
         topics = rospy.get_param('topics')
         img_data = rospy.get_param('frame_data')
         self.IMG_HEIGHT, self.IMG_WIDTH = img_data['HEIGHT'], img_data['WIDTH']
-
+        
         self.kmeans = None
         # Define communication points
         self.detections_sub = rospy.Subscriber(
@@ -54,7 +56,7 @@ class DataProcessor:
             PointStamped,
             queue_size=1
         )
-        
+
         self.bad_detect_req = rospy.ServiceProxy(
             topics['bad_detections'],
             Empty
@@ -420,35 +422,38 @@ class DataProcessor:
         return PointStamped(
             header=header,
             point=point_msg
-        ) 
+        )
     
-    def _adjust_plot(kmeans_fig):
+    def _adjust_plot(kmeans_fig, *args, **kwargs):
         ...
 
     def detections_callback(self, detections_msg: ROSNumpyList_Float32):
         kmeans_data, _ = self.process_detections(detections_msg)
+        print(kmeans_data)
         clusters, centroids = self.cluster_data(kmeans_data)
         uav_candidates = self.filter_clusters(
             clusters=clusters,
             centroids=centroids
         )
-        # End callback if no candidates
+        print(uav_candidates)
+        uav_candidates = {}
         if not uav_candidates:
             self.bad_detect_req()
+            self.kmeans.closefig(True)
             return
         uav_xy = self.vote(uav_candidates)
-
-        """
+        
+        '''
         Run depth image processing here
         Output PointStamped message
-        """
+        '''
         waypoint = self.pointstamped_from_imgcoord(uav_xy)
         self.waypoint_pub.publish(waypoint)
-        if self.debug:
-            self.kmeans.closefig(close_all=True)
+        self.kmeans.closefig(close_all=True)
 
 if __name__ == '__main__':
     try:
         DataProcessor()
     except rospy.ROSInterruptException:
         pass
+

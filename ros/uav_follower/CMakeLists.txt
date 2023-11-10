@@ -169,6 +169,9 @@ catkin_install_python(
   scripts/ss01_Photographer.py
   scripts/ss02_Detector.py
   scripts/ss03_DataProcessor.py
+  scripts/simulated_ss00_Liaison.py
+  scripts/simulated_ss02_Detector.py
+  scripts/simulated_ss03_DataProcessor.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

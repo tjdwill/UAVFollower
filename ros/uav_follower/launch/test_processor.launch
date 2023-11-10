@@ -1,0 +1,12 @@
+<?xml version="1.0" ?>
+
+<launch>
+	<group ns="uav_follower_test">
+		<rosparam command="load" file="$(find uav_follower)/config/uav_follower_params.yaml" />
+		<node name="ss03_DataProcessor" pkg="uav_follower" type="simulated_ss03_DataProcessor.py" output="screen" required="true">
+            		<param name="debug" type="bool" value="True" />
+        	</node>
+		<node name="ss00_Liaison" pkg="uav_follower" type="simulated_ss00_Liaison.py" output="screen" required="true"></node>
+		<node name="ss02_Detector" pkg="uav_follower" type="simulated_ss02_Detector.py" output="screen" required="true"></node>
+	</group>
+</launch>
