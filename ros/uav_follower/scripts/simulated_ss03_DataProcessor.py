@@ -18,7 +18,7 @@ from rosnp_msgs.msg import ROSNumpyList_Float32, ROSNumpyList_UInt16
 from rosnp_msgs.rosnp_helpers import decode_rosnp_list
 from std_msgs.msg import Header
 from geometry_msgs.msg import Point, PointStamped
-from uav_follower.kmeans import KMeans
+from uav_follower.kmeans_debug import KMeans
 from uav_follower.srv import DepthImgReq
 from std_srvs.srv import Empty
 
@@ -424,8 +424,15 @@ class DataProcessor:
             point=point_msg
         )
     
-    def _adjust_plot(kmeans_fig, *args, **kwargs):
-        ...
+    def _adjust_plot(self, ax):
+        """Customize the figure"""
+        ax.grid()
+        ax.set_title('UAV Detection Clustering')
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_xlim(0, self.IMG_WIDTH)
+        ax.set_ylim(self.IMG_HEIGHT, 0)
+        plt.pause(3)
 
     def detections_callback(self, detections_msg: ROSNumpyList_Float32):
         kmeans_data, _ = self.process_detections(detections_msg)

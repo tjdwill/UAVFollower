@@ -1,11 +1,13 @@
 detect_thresh: 7
 
+fps: 30  # ss01 Pub Rate
+
 topics:
     img_topic: "RGBHub"
     detections: "detections"
     resume_trigger: "resume_trigger"
     depth_req: "depth_req"
-    waypoints: "clicked_point"
+    waypoints: "waypoints"
     bad_detections: "bad_detections"
 
 frame_data:
@@ -26,3 +28,8 @@ ss03_DataProcessor:
     debug: False
     density_thresh: 1.5
     max_accel: 5
+    focal_length: 359.0439147949219
+    principal_point:
+    # [cx, cy]
+        - 321.4884338378906
+        - 181.9486541748047

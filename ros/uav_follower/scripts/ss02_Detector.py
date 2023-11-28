@@ -61,7 +61,7 @@ class UAVDetector:
         self.container = []
         self.detections = 0
         self.collecting = True  # whether to collect UAV detections or not
-        
+
         # Define ROS Communications
         self.detections_pub = rospy.Publisher(
             self.topics['detections'],
@@ -163,7 +163,6 @@ class UAVDetector:
         tensor = tensor.cpu()
         
         detected = self.box_display(rgb, tensor)
-        print(f'{self.name}: Time Elapsed: {rospy.get_time() - start}')
         # Detection logic
         if not detected:
             self.container.clear()
@@ -183,7 +182,8 @@ class UAVDetector:
                     # Halt data collection until signal if *not* in testing mode
                     if not self.testing:
                         self.collecting = False
-
+                    else:    
+                        print(f'{self.name}: Time Elapsed: {rospy.get_time() - start}')
     def __del__(self):
         cv2.destroyAllWindows()
 if __name__ == '__main__':

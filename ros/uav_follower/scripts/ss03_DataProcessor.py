@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*-coding: utf-8-*-
 """
-@author: Terrance Williams
-@date: 7 November 2023
-@description:
+@author: Terrance Williams @date: 7 November 2023 @description:
     This program defines the node for the Data Processor that processes
     bounding boxes, calculates centers, performs k-means clustering and more.
 """
@@ -32,10 +30,15 @@ class DataProcessor:
         self.DENSITY_THRESH = rospy.get_param('~density_thresh', default=1.5)
         self.MAX_ACCEL = rospy.get_param('~max_accel', default=5)
         topics = rospy.get_param('topics')
+        waypoints_topic = rospy.get_param('~waypoints')
+        self.base_frame_topic = rospy.get_param('~base_frame_topic')
+
         img_data = rospy.get_param('frame_data')
         self.IMG_HEIGHT, self.IMG_WIDTH = img_data['HEIGHT'], img_data['WIDTH']
+        self.f_px = rospy.get_param('~focal_length', default=359.0439147949219)
+        principal_point = rospy.get_param('~principal_point')
+        self.cx, self.cy = principal_point
 
-        self.kmeans = None
         # Define communication points
         self.detections_sub = rospy.Subscriber(
             topics['detections'],
@@ -50,7 +53,7 @@ class DataProcessor:
         )
 
         self.waypoint_pub = rospy.Publisher(
-            topics['waypoints'],
+            waypoints_topic,
             PointStamped,
             queue_size=1
         )
@@ -77,37 +80,33 @@ class DataProcessor:
     Parameters
     ----------
     xyxyn_container: list
-        A list containing all appended boundary box xyxyn values from
-        Machine Learning inferences.
-        Each array is in format [xmin, ymin, xmax, ymax]. The four corner
-        points can be constructed from these values, and/or the center
-        point can be calculated via midpoint of corresponding values
+        A list containing all appended boundary box xyxyn values from Machine
+        Learning inferences. Each array is in format [xmin, ymin, xmax, ymax].
+        The four corner points can be constructed from these values, and/or the
+        center point can be calculated via midpoint of corresponding values
             - x = horizontal index (along image columns)
             - y = vertical index (along image rows)
             
      ndim: int (optional)
-        number of elements in each given array.
-        Defaults to six (xmin, ymin, xmax, ymax, conf, label_id)
+        number of elements in each given array. Defaults to six (xmin, ymin,
+        xmax, ymax, conf, label_id)
 
     Returns
     -------
     - <processed_data>: tuple
-        Using a tuple in order to facilitate ease of refactoring.
-        If I need to return more data
-        (ex. calculated area, confidence intervals, etc.),
-        I will be able to do so after modifying the inner-processing.
-        A dictionary is chosen for both elements because they are
-        query-able by key.
-        I need not know the order in which the data is stored.
+        Using a tuple in order to facilitate ease of refactoring. If I need to
+        return more data (ex. calculated area, confidence intervals, etc.), I
+        will be able to do so after modifying the inner-processing. A
+        dictionary is chosen for both elements because they are query-able by
+        key. I need not know the order in which the data is stored.
 
         0. kmeans_data: dict
-            A dictionary of data for kmeans clustering.
-            Includes (in order)
+            A dictionary of data for kmeans clustering. Includes (in order)
 
-            - centers: list
-                The key is 'centers'.
+            - xyxyns: list
+                The key is 'xyxyns'.
 
-                The flat container of calculated box centers.
+                The flat container of bbox coordinates.
 
 
             - k_val: int
@@ -119,16 +118,15 @@ class DataProcessor:
             - means: np.ndarray
                 The key is 'means'.
 
-                The array with the most entries to be used as initial
-                means in clustering. The idea is to mitigate effects
-                of outliers in the data because said outliers would
-                hopefully) serve as cluster centroids, meaning they are
-                less likely to be included in the clusters that
-                correspond to the "real", non-noisy data.
+                The array with the most entries to be used as initial means in
+                clustering. The idea is to mitigate effects of outliers in the
+                data because said outliers would hopefully) serve as cluster
+                centroids, meaning they are less likely to be included in the
+                clusters that correspond to the "real", non-noisy data.
 
         1. other_data: dict
-            A dictionary storing extra data needed for processing (if any).
-            Its keys should be strings that semantically convey the information
+            A dictionary storing extra data needed for processing (if any). Its
+            keys should be strings that semantically convey the information
             stored within.
     """
         detections = [
@@ -136,32 +134,29 @@ class DataProcessor:
             for arr in decode_rosnp_list(xyxyn_container)
         ]
         
-        xyxyns = [arr[..., :4] for arr in detections]
+        xyxyns = [arr[..., :4] for arr in detections]  # normalized bbox coords
         
-        index = 0
-        centers, k_val, means = [], 0, None
+        # index = 0
+        flattened, k_val, means = [], 0, None
         for arr in xyxyns:
             rows = arr.shape[0]
             for row in arr:
-                x1 = int(row[0] * self.IMG_WIDTH)
-                y1 = int(row[1] * self.IMG_HEIGHT)
-                x2 = int(row[2] * self.IMG_WIDTH)
-                y2 = int(row[3] * self.IMG_HEIGHT)
-                center = np.uint16([(x1 + x2)/2, (y1 + y2)/2])
-                centers.append(center)
+                flattened.append(row)
             if rows > k_val:
                 k_val = rows
-                means = centers[index:index+rows]
-            index += rows
+                # means = flattened[index:index+rows]
+                means = arr
+            # index += rows
         else:
             assert k_val == len(means)
 
         kmeans_params = {
-            'centers': centers,
+            'xyxyns': flattened,
             'k': k_val,
             'means': means
         }
-
+        # print(f'\n<process_detections>: flattened arrays: {flattened}')
+        # print(f'\n<process_detections>: Means: \n{means}\n')
         other_data = {}
 
         return kmeans_params, other_data
@@ -169,20 +164,17 @@ class DataProcessor:
     def cluster_data(self, kmeans_params: dict) -> Tuple[dict, list, int]:
         """Performs kmeans clustering and returns data"""
         k = kmeans_params['k']
-        centers = kmeans_params['centers']
+        xyxyns = kmeans_params['xyxyns']
         init_means = kmeans_params['means']
 
         self.kmeans = KMeans(
-            data=centers,
+            data=xyxyns,
             initial_means=init_means,
             segments=k,
-            threshold=0.1
+            threshold=0.05
         )
-        if self.debug:
-            clusters, centroids, _ = self.kmeans.cluster(display=True)
-            self._adjust_plot(self.kmeans.axes2D)
-        else:
-            clusters, centroids, _ = self.kmeans.cluster(display=False)
+        clusters, centroids, _ = self.kmeans.cluster()
+        # print(f'<cluster_data>: {clusters}\nCentroids: {centroids}')
         return clusters, centroids
     
     def filter_clusters(
@@ -195,12 +187,10 @@ class DataProcessor:
         Parameters
         ----------
         clusters : dict
-            Clusters from KMeans.cluster function.
-            Comes in [x,y] order.
+            Clusters from KMeans.cluster function. Comes in [x,y] order.
 
         centroids : np.ndarray
-            Centroids from KMeans.cluster function.
-            Comes in [x,y] order.
+            Centroids from KMeans.cluster function. Comes in [x,y] order.
 
         COUNT_THRESH: int
             Minimum points in a cluster to be a qualifying candidate.
@@ -209,9 +199,7 @@ class DataProcessor:
         -------
         comparison_dict
             A Dictionary with the following information:
-                key: cluster number
-                value: tuple
-                Value Contents:
+                key: cluster number value: tuple Value Contents:
                     - cluster_centroid ([y, x] order): np.ndarray
                         Center of the cluster
                     - cluster_point_count: int
@@ -245,10 +233,9 @@ class DataProcessor:
                 vel = distances[1:]-distances[0:-1]
                 accel = vel[1:] - vel[:-1]
                 if max(accel) > ACCEL_MAX:
-                    # Find the index of max acceleration.
-                    # Grab the distance two sorted points away
-                    # from the point with the max acceleration.
-                    # Use this value as the radius.
+                    # Find the index of max acceleration. Grab the distance two
+                    # sorted points away from the point with the max
+                    # acceleration. Use this value as the radius.
                     index = np.nonzero(np.equal(accel, max(accel)))[0]
                     index_num = index[0]
                     r_max = distances[index_num]
@@ -257,15 +244,8 @@ class DataProcessor:
                 area = np.pi * (r_max**2)
                 # Data is now np.float64
                 clust_point_density = clust_point_count / area
-                '''
-                # ADD CIRCLE TO PLOT
-                km.axes2D.add_patch(plt.Circle(centroid,
-                                                radius=r_max,
-                                                fill=False,
-                                                linestyle='--'))
-                '''
 
-                clust_centroid = centroid[::-1]  # [col, row] -> [row, col]
+                clust_centroid = centroid
 
                 # Gather data
                 comparison_data.update(
@@ -304,9 +284,8 @@ class DataProcessor:
             for key in cluster_candidates:
                 print(cluster_candidates[key])
 
-        # Recall the dict values have order
-        # (clust_centroid, clust_point_count, clust_point_density)
-        # Matching Index: 0, 1, 2
+        # Recall the dict values have order (clust_centroid, clust_point_count,
+        # clust_point_density) Matching Index: 0, 1, 2
 
         num_candidates = len(cluster_candidates)
 
@@ -341,10 +320,10 @@ class DataProcessor:
                 elif density > second_place_density:
                     second_place_density, spindex = density, key
                 elif count == 1 and (fpindex == spindex):
-                    # Get the second place contender; Doing this will result in the
-                    # Function voting properly in the case of only two candidates
-                    # with identical densities. Otherwise,
-                    # both 1st and 2nd place would be the same candidate.
+                    # Get the second place contender; Doing this will result in
+                    # the Function voting properly in the case of only two
+                    # candidates with identical densities. Otherwise, both 1st
+                    # and 2nd place would be the same candidate.
                     second_place_density, spindex = density, key
             count += 1
         else:
@@ -368,7 +347,10 @@ class DataProcessor:
             # Return point in (x, y) form
             return winner[::-1]
     
-    def pointstamped_from_imgcoord(self, img_coordinates: np.ndarray):
+    def pointstamped_from_imgcoord(
+            self,
+            normalized_bbox_coordinates: np.ndarray
+            ):
         """
         Generate a PointStamped message from [x,y] coordinates
         
@@ -377,54 +359,96 @@ class DataProcessor:
             2. Back project depth region and (x, y) into proper coord frame. 
             3. Create and return PointStamped message of the waypoint
         """
-        x_index, y_index = img_coordinates.astype(np.uint16)
+        # Have x_px and y_px be uint16 for slicing. Convert later
+        x_min = (normalized_bbox_coordinates[0] * self.IMG_WIDTH).astype(np.uint16)
+        y_min = (normalized_bbox_coordinates[1] * self.IMG_HEIGHT).astype(np.uint16)
+        x_max = (normalized_bbox_coordinates[2] * self.IMG_WIDTH).astype(np.uint16)
+        y_max = (normalized_bbox_coordinates[3] * self.IMG_HEIGHT).astype(np.uint16)
         
+        print(x_min, y_min, x_max, y_max)
+        print(normalized_bbox_coordinates)
+
+        cx, cy = self.cx, self.cy
+        f_px = self.f_px
+        
+        # Retrieve and convert depth images
         num_imgs: int = 3
         depth_imgs_msg = self.depth_req(num_imgs)
         depth_imgs = decode_rosnp_list(depth_imgs_msg.depth_imgs)
         assert num_imgs == len(depth_imgs)
-        dtype = depth_imgs[0].dtype
+        ## Convert type for math operations; prevent values "rolling over" (ex. 65535 + 1 -> 0)
+        depth_imgs = [arr.astype(np.float64) for arr in depth_imgs]
 
         # Average the depth images
-        avg_depth_img = depth_imgs[0]
+        avgd_depth_img = depth_imgs[0]
         for i in range(1, num_imgs):
-            avg_depth_img = avg_depth_img + depth_imgs[i]
+            avgd_depth_img = avgd_depth_img + depth_imgs[i]
         else:
-            avg_depth_img = (avg_depth_img / num_imgs).astype(dtype)
+            avgd_depth_img = (avgd_depth_img / num_imgs)
 
-        # Select point region and average to get the average Z val
-        pad = 1
+        # Select bbox region and average values to get the average Z val
+        slice_y = slice((y_min + 1), y_max)
+        slice_x = slice((x_min + 1), x_max)
+        # print(slice_y, slice_x)
         try:
-            region = avg_depth_img[
-                (y_index - pad):(y_index + (pad + 1)),
-                (x_index - pad):(x_index + pad + 1)
+            region = avgd_depth_img[
+                    slice_y,
+                    slice_x,
+                    # (y_min + 1):y_max,
+                    # (x_min + 1):x_max
             ]
-            Z_avg = np.average(region).astype(np.uint16)
+            Z_c = np.average(region)
+            print(region)
         except IndexError:
             rospy.logwarn(
-                (f'Index Error; Img_size: {avg_depth_img.shape}\n'
+                (f'Index Error; Img_size: {avgd_depth_img.shape}\n'
                 'Slice index: '
-                f'[{(y_index - pad)}:{(y_index + pad + 1)}, '
-                f'{x_index - pad}:{x_index + pad + 1}]')
+                f'[{slice_y}, '
+                f'{slice_x}]')
             )
-            Z_avg = avg_depth_img[y_index, x_index]
-        rospy.loginfo(f'Averaged Z_val: {Z_avg}')
+            Z_c = avgd_depth_img[
+                    np.average([y_min, y_max]),
+                    np.average([x_min, x_max])
+                ]
+        if Z_c == 0:
+            return None
+        else:
+            Z_c = Z_c / 1000  # convert to meters
+        rospy.loginfo(f'Averaged Z_val: {Z_c}')
+
         # Craft output message
         header = Header(
-            frame_id='map',
+            frame_id=self.base_frame_topic,
             stamp=rospy.Time.now()
         )
-        
-        point = np.float64([x_index, y_index, Z_avg])
-        point_msg = Point(*point)
+
+        # Calculate body-frame vector
+        """
+        The conversion from body-frame to image frame is:
+            - one +90 deg rotation about the z-axis
+            - one subsequent -90 deg rotation about the resulting x-axis.
+        To recover the body-frame coordinate, we invert the rotation and apply
+        the correct scaling.
+
+        The formula is body_frame = [x, y, z]^T = (Z_c / f_px)*[f_px, -x_px,
+        -y_px]^T
+        """
+        x_px = np.average(np.array([x_min, x_max]).astype(np.float64))
+        y_px = np.average(np.array([y_min, y_max]).astype(np.float64))
+        body_frame = (Z_c / f_px) * np.array([f_px, cx-x_px, cy-y_px]).astype(np.float64)
+        print(body_frame) 
+        # body_frame = np.float64([0.2, .1, 0])
+        point_msg = Point()
+        point_msg.x, point_msg.y, point_msg.z = body_frame
+        # point_msg.z = 0.
+        if self.debug:
+            print(f'UAV Detected: {body_frame}')
+            
         return PointStamped(
             header=header,
             point=point_msg
         ) 
     
-    def _adjust_plot(kmeans_fig):
-        ...
-
     def detections_callback(self, detections_msg: ROSNumpyList_Float32):
         kmeans_data, _ = self.process_detections(detections_msg)
         clusters, centroids = self.cluster_data(kmeans_data)
@@ -436,19 +460,21 @@ class DataProcessor:
         if not uav_candidates:
             self.bad_detect_req()
             return
-        uav_xy = self.vote(uav_candidates)
+        uav_xyxyn = self.vote(uav_candidates)
 
         """
-        Run depth image processing here
-        Output PointStamped message
+        Run depth image processing here Output PointStamped message
         """
-        waypoint = self.pointstamped_from_imgcoord(uav_xy)
+        waypoint = self.pointstamped_from_imgcoord(uav_xyxyn)
+        if waypoint is None:
+            self.bad_detect_req()
+            return
         self.waypoint_pub.publish(waypoint)
-        if self.debug:
-            self.kmeans.closefig(close_all=True)
-
+    
 if __name__ == '__main__':
     try:
         DataProcessor()
     except rospy.ROSInterruptException:
         pass
+
+

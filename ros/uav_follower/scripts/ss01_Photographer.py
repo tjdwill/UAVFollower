@@ -15,7 +15,7 @@ def send_imgs():
     
     name = rospy.get_name()
     QUEUE_MAX = 1
-    FPS = 30
+    FPS = rospy.get_param('fps')
     img_data = rospy.get_param('frame_data')
     IMG_HEIGHT = img_data['HEIGHT']
     IMG_WIDTH = img_data['WIDTH']
@@ -23,10 +23,11 @@ def send_imgs():
     pub_topic = topics['img_topic']
     rate = rospy.Rate(FPS)
     
-    rospy.wait_for_service(topics['resume_trigger'])
     pub = rospy.Publisher(pub_topic, ROSNumpy_UInt8, queue_size=QUEUE_MAX)
     rospy.loginfo(f"{name}: Online.")
-    
+    while pub.get_num_connections() < 1:
+        rospy.sleep(1)
+
     # OpenCV
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, IMG_HEIGHT)

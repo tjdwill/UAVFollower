@@ -12,6 +12,7 @@
 import numpy as np
 import rospy
 from rosnp_msgs.rosnp_helpers import encode_rosnp_list
+from move_base_msgs.msg import MoveBaseActionResult
 from std_srvs.srv import Empty, EmptyResponse
 from sensor_msgs.msg import Image
 from uav_follower.srv import DepthImgReq, DepthImgReqResponse
@@ -39,6 +40,11 @@ class NodeLiaison:
             topics['bad_detections'],
             Empty,
             self.bad_detect_action
+        )
+        self.move_base_sub = rospy.Subscriber(
+                rospy.get_param("~move_base_result"),
+                MoveBaseActionResult,
+                self.send_resume_signal
         )
 
         self.collect = False
@@ -79,7 +85,7 @@ class NodeLiaison:
         else:
             pass
 
-    def send_resume_signal(self):
+    def send_resume_signal(self, msg):
         self.resume_trigger()
 
 
