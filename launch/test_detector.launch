@@ -1,0 +1,14 @@
+<?xml version="1.0" ?>
+<!--
+    This launch file sets up an environment to test the photographer and UAV detection
+    nodes in isolation. 
+-->
+<launch>
+	<group ns="uav_follower_test">
+		<rosparam command="load" file="$(find uav_follower)/config/uav_follower_params.yaml" />
+		<node name="ss01_Photographer" pkg="uav_follower" type="ss01_Photographer.py" output="screen" required="true"></node>
+		<node name="ss02_Detector" pkg="uav_follower" type="ss02_Detector.py" output="screen" required="true">
+            		<param name="testing" type="bool" value="True"/>
+        	</node>
+	</group>
+</launch>
