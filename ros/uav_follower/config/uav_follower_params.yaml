@@ -1,6 +1,6 @@
 detect_thresh: 7
 
-fps: 30  # ss01 Pub Rate
+fps: 24  # ss01 Pub Rate
 
 topics:
     img_topic: "RGBHub"

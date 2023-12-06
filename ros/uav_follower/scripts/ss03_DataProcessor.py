@@ -16,8 +16,9 @@ from rosnp_msgs.rosnp_helpers import decode_rosnp_list
 from std_msgs.msg import Header
 from geometry_msgs.msg import Point, PointStamped
 from uav_follower.kmeans import KMeans
-from uav_follower.srv import DepthImgReq
+from uav_follower.srv import DepthImgReq, TF2Poll
 from std_srvs.srv import Empty
+
 
 class DataProcessor:
     def __init__(self):
@@ -31,7 +32,7 @@ class DataProcessor:
         self.MAX_ACCEL = rospy.get_param('~max_accel', default=5)
         topics = rospy.get_param('topics')
         waypoints_topic = rospy.get_param('~waypoints')
-        self.base_frame_topic = rospy.get_param('~base_frame_topic')
+        self.frame_id = rospy.get_param('~frame_id')
 
         img_data = rospy.get_param('frame_data')
         self.IMG_HEIGHT, self.IMG_WIDTH = img_data['HEIGHT'], img_data['WIDTH']
@@ -46,26 +47,31 @@ class DataProcessor:
             self.detections_callback
         )
         
-        rospy.wait_for_service(topics['depth_req'])
-        self.depth_req = rospy.ServiceProxy(
-            topics['depth_req'],
-            DepthImgReq
-        )
-
         self.waypoint_pub = rospy.Publisher(
             waypoints_topic,
             PointStamped,
             queue_size=1
         )
-        
+        ## Services 
+        rospy.wait_for_service(topics['depth_req'])
+        self.depth_req = rospy.ServiceProxy(
+            topics['depth_req'],
+            DepthImgReq
+        )
         self.bad_detect_req = rospy.ServiceProxy(
             topics['bad_detections'],
             Empty
         )
 
+        ### tf2 service
+        self.tf2_req = rospy.ServiceProxy(
+                'tf2_poll',
+                TF2Poll
+        )
+
         rospy.loginfo(f"{self.name} Online.")
         rospy.spin()
-        
+
     def process_detections(
             self,
             xyxyn_container: ROSNumpyList_Float32,
@@ -344,8 +350,7 @@ class DataProcessor:
                 else:
                     winner = cluster_candidates[spindex][0]
                     rospy.loginfo(f"VOTE: Upset! Winner decided by point count' Cluster {spindex}")
-            # Return point in (x, y) form
-            return winner[::-1]
+            return winner
     
     def pointstamped_from_imgcoord(
             self,
@@ -397,8 +402,9 @@ class DataProcessor:
                     # (y_min + 1):y_max,
                     # (x_min + 1):x_max
             ]
-            Z_c = np.average(region)
-            print(region)
+            # Z_c = np.average(region) # remove 0s in the array
+            Z_c = np.average(region[region != 0])
+            print(region[region != 0])
         except IndexError:
             rospy.logwarn(
                 (f'Index Error; Img_size: {avgd_depth_img.shape}\n'
@@ -410,16 +416,18 @@ class DataProcessor:
                     np.average([y_min, y_max]),
                     np.average([x_min, x_max])
                 ]
-        if Z_c == 0:
+        if Z_c == 0 or np.isnan(Z_c):
             return None
         else:
             Z_c = Z_c / 1000  # convert to meters
-        rospy.loginfo(f'Averaged Z_val: {Z_c}')
+            # Z_c = Z_c / 10 # value correction (rogue const. acknowledgement)
+        rospy.loginfo(f'Averaged Z_val (m): {Z_c}')
 
         # Craft output message
+        # future_offset = rospy.Duration(0.3)
         header = Header(
-            frame_id=self.base_frame_topic,
-            stamp=rospy.Time.now()
+            frame_id=self.frame_id,
+            stamp=rospy.Time.now()#+future_offset
         )
 
         # Calculate body-frame vector
@@ -436,10 +444,18 @@ class DataProcessor:
         x_px = np.average(np.array([x_min, x_max]).astype(np.float64))
         y_px = np.average(np.array([y_min, y_max]).astype(np.float64))
         body_frame = (Z_c / f_px) * np.array([f_px, cx-x_px, cy-y_px]).astype(np.float64)
-        print(body_frame) 
+        print(body_frame)
         # body_frame = np.float64([0.2, .1, 0])
+
+        # Request tf2 Data
+        transln = self.tf2_req().translation
+        print(f'Received: {transln}')
+
         point_msg = Point()
-        point_msg.x, point_msg.y, point_msg.z = body_frame
+        point_msg.x = body_frame[0] + transln.x
+        point_msg.y = body_frame[1] + transln.y
+        point_msg.z = body_frame[2] + transln.z
+        print(f'\n{self.name}: Point msg:\n{point_msg}')
         # point_msg.z = 0.
         if self.debug:
             print(f'UAV Detected: {body_frame}')

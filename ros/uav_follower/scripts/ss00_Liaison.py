@@ -17,6 +17,7 @@ from std_srvs.srv import Empty, EmptyResponse
 from sensor_msgs.msg import Image
 from uav_follower.srv import DepthImgReq, DepthImgReqResponse
 
+
 class NodeLiaison:
     def __init__(self) -> None:
         rospy.init_node('ss00_Liaison', log_level=rospy.INFO)
@@ -46,7 +47,17 @@ class NodeLiaison:
                 MoveBaseActionResult,
                 self.send_resume_signal
         )
-
+        
+        """
+        # For tests in which we don't want to run the full navigation
+        # but still want continuous detections.
+        from geometry_msgs.msg import PointStamped
+        self.test_sub = rospy.Subscriber(
+                "/jethexa/waypoints",
+                PointStamped,
+                self.send_resume_signal
+        )
+        """
         self.collect = False
         self.imgs = []
         self.amount = -1
