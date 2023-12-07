@@ -136,7 +136,7 @@ class NodeLiaison:
         Resume data collection if last movement was successful.
         """
         # A visual test to see if we get multiple messages over one move
-        rospy.loginfo(f'{self.name} Received Move Base Status\n') 
+        rospy.loginfo(f'{self.name} Received Move Base Status\n{msg}\n') 
         
         status = msg.status.status
         if status == msg.status.SUCCEEDED:

@@ -375,17 +375,18 @@ class DataProcessor:
             2. Back project depth region and (x, y) into proper coord frame. 
             3. Create and return PointStamped message of the waypoint
         """
+
+        # ===============
+        # Obtain Z Value
+        # ===============
+        '''Average Z values for the bounding box region'''
         # Have values be uint16 for slicing. Convert later
         x_min = (normalized_bbox_coordinates[0] * self.IMG_WIDTH).astype(np.uint16)
         y_min = (normalized_bbox_coordinates[1] * self.IMG_HEIGHT).astype(np.uint16)
         x_max = (normalized_bbox_coordinates[2] * self.IMG_WIDTH).astype(np.uint16)
         y_max = (normalized_bbox_coordinates[3] * self.IMG_HEIGHT).astype(np.uint16)
         
-        rospy.loginfo(f'<{self.name}> Calculated BBox coords: ', x_min, y_min, x_max, y_max)
-        
-        # Intrinsic Camera Parameters for back projection
-        cx, cy = self.cx, self.cy
-        f_px = self.f_px
+        rospy.loginfo(f"<{self.name}> Calculated BBox coords: {x_min}, {y_min}, {x_max}, {y_max})")
         
         # Retrieve and convert depth images
         num_imgs: int = 3
@@ -410,37 +411,12 @@ class DataProcessor:
                     slice_y,
                     slice_x,
             ]
-            # Z_c = np.average(region) # remove 0s in the array
-            Z_c = np.average(region[region != 0])
+            # '0' is an invalid value for OpenNI depth images; remove them
             nonzero_region = region[region != 0]
- 
-            '''
-            Perform data collection and output for depth image investigation
-            '''
-            if self.testing:
-                # Save numpy array to file
-                from pathlib import Path
-                import time
-                cat = "".join()
-
-                sv_dir = Path('/home/hiwonder/test_ws/src/uav_follower/logs')
-                if not sv_dir.is_dir():
-                    sv_dir.mkdir()
-                timestr = time.strftime("%Y%m%d-%H%M%S")
-                np_file = Path / cat(timestr, '_depthArray.npy')
-                with open(np_file, 'wb') as f:
-                    np.save(f, region)
-
-                with np.printoptions(threshold=np.inf):
-                    print(f'Non-zero depth values (mm):\n')
-                    for row in nonzero_region:
-                        print(row)
-                    print(f'\nFull Averaged Depth values size:\n{region.shape}\n')
-                    print(f'Non-zero region size: {nonzero_region.shape}\n')
-                    print(f'Min Depth (mm) {np.min(nonzero_region)}')
-                    print(f'Max Depth (mm) {np.max(nonzero_region)}')
-
+            Z_c = np.average(nonzero_region)
         except IndexError:
+            # Couldn't average the bounding box depth values;
+            # Log error and use center point depth instead
             rospy.logwarn(
                 (f'Index Error; Img_size: {avgd_depth_img.shape}\n'
                 'Slice index: '
@@ -451,20 +427,49 @@ class DataProcessor:
                     np.average([y_min, y_max]),
                     np.average([x_min, x_max])
                 ]
-        if Z_c == 0 or np.isnan(Z_c):
-            return None
         else:
-            Z_c = Z_c / 1000  # convert to meters
-        rospy.loginfo(f'<{self.name}> Averaged Z_val (m): {Z_c}')
+            # Perform data collection for depth image investigation
+            if self.testing:
+                from pathlib import Path
+                import time
+                cat = "".join
+
+                # Save Numpy array to file
+                sv_dir = Path('/home/hiwonder/test_ws/src/uav_follower/logs')
+                if not sv_dir.is_dir():
+                    sv_dir.mkdir()
+
+                timestr = time.strftime("%Y%m%d-%H%M%S")
+                print(type(timestr))
+                print(timestr)
+                np_file = sv_dir / cat([timestr, '_depthArray.npy'])
+                with open(np_file, 'wb') as f:
+                    np.save(f, region)
+
+                # Print array and other info to screen
+                with np.printoptions(threshold=np.inf):
+                    print(f'Non-zero depth values (mm):\n')
+                    for row in nonzero_region:
+                        print(row)
+                    print(f'\nFull Averaged Depth values size:\n{region.shape}\n')
+                    print(f'Non-zero region size: {nonzero_region.shape}\n')
+                    print(f'Min Depth (mm) {np.min(nonzero_region)}')
+                    print(f'Max Depth (mm) {np.max(nonzero_region)}')
+        finally:
+            if Z_c == 0 or np.isnan(Z_c):
+                rospy.logwarn(f'{self.name}: Invalid Z value {Z_c}.')
+                return None
+            else:
+                Z_c = Z_c / 1000  # convert to meters
+                rospy.loginfo(f'{self.name}: Averaged Z_val (m): {Z_c}')
 
         # =====================
         # Craft output message
         # =====================
         header = Header(
             frame_id=self.frame_id,
-            stamp=rospy.Time.now()#+future_offset
+            stamp=rospy.Time.now()
         )
-
         # Calculate body-frame vector
         """
         The conversion from body-frame to image frame is:
@@ -476,23 +481,32 @@ class DataProcessor:
         The formula is body_frame = [x, y, z]^T 
         = (Z_c / f_px)*[f_px, -x_px, -y_px]^T
         """
+        # Intrinsic Camera Parameters for back projection
+        cx, cy = self.cx, self.cy
+        f_px = self.f_px
         x_px = np.average(np.array([x_min, x_max]).astype(np.float64))
         y_px = np.average(np.array([y_min, y_max]).astype(np.float64))
         body_frame = (Z_c / f_px) * np.array([f_px, cx-x_px, cy-y_px])
         
         if self.testing:
-            transln = Point(0., 0., 0.)
+            from geometry_msgs.msg import Vector3
+            transln = Vector3(0., 0., 0.)
         else:
-            # Request tf2 Data
-            transln = self.tf2_req().translation
-            print(f'Received: {transln}')
+            # Request tf2 Data (TF2PollResponse msg)
+            tf2_resp = self.tf2_req()
+            if not tf2_resp.successful:
+                rospy.logwarn(f'{self.name}: Could not get transform.')
+                return None
+            else:
+                transln = tf2_resp.translation
+                rospy.loginfo(f'{self.name} Received Transform (map->base_link):\n{transln}\n')
         
         point_msg = Point()
         point_msg.x = body_frame[0] + transln.x
         point_msg.y = body_frame[1] + transln.y
         point_msg.z = body_frame[2] + transln.z
         
-        rospy.loginfo(f'\n<{self.name}>: Point msg:\n{point_msg}')
+        rospy.loginfo(f'{self.name}: Point msg:\n{point_msg}')
         if self.debug:
             print(f'UAV Detected: {body_frame}')
             

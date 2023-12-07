@@ -15,7 +15,7 @@ from __future__ import print_function
 import rospy
 import tf2_ros
 from geometry_msgs.msg import Vector3
-from uav_follower.srv import TF2Poll
+from uav_follower.srv import TF2Poll, TF2PollResponse
 
 """
 The idea of this node is to listen to the transform from jethexa/map to
@@ -38,23 +38,32 @@ class tf2Watcher:
                 TF2Poll,
                 self.response
         )
-        rospy.loginfo(f'{self.name}: Online.')
+        rospy.loginfo('{}: Online.'.format(self.name))
         rospy.spin()
 
     def response(self, *args, **kwargs):
         """Get transform, extract Vector3, send in response"""
-        current_transf = self.tfBuffer.lookup_transform(
+        resp = TF2PollResponse()
+        try:
+            current_transf = self.tfBuffer.lookup_transform(
                 self.map_frame, 
                 self.base_frame,
                 rospy.Time.now(),
                 rospy.Duration(1.25)
-        )
-        print("<{name}>: current_transf".format(self.name))
-        translation = current_transf.transform.translation
-        assert(isinstance(translation, Vector3))
-        # print(translation)
-        # print(type(translation))
-        return translation
+            )
+        except (tf2_ros.LookupException,
+                tf2_ros.ConnectivityException, 
+                tf2_ros.ExtrapolationException):
+            resp.successful = False
+            resp.translation = Vector3()
+            # what are messages initialized as?            
+        else:
+            print("<{}>: current_transf".format(self.name))
+            translation = current_transf.transform.translation
+            assert(isinstance(translation, Vector3))
+            resp.successful = True
+            resp.translation = translation
+        return resp
 
 
 if __name__ == "__main__":
