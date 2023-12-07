@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 # -*-coding: utf-8-*-
 
+"""
+@author: Terrance Williams
+@title: ss01_Photographer
+@description:
+    This node captures images using the robot's on-board camera and publishes
+    to a topic.
+"""
+
 import cv2
 import numpy as np
 import time
@@ -12,7 +20,7 @@ from rosnp_msgs.rosnp_helpers import encode_rosnp
 def send_imgs():
     # ROS Setup
     rospy.init_node('ss01_Photographer', anonymous=False, log_level=rospy.INFO)
-    
+    ## Parameters
     name = rospy.get_name()
     QUEUE_MAX = 1
     FPS = rospy.get_param('fps')
@@ -22,13 +30,15 @@ def send_imgs():
     topics = rospy.get_param('topics')
     pub_topic = topics['img_topic']
     rate = rospy.Rate(FPS)
-    
+    ## Comms
     pub = rospy.Publisher(pub_topic, ROSNumpy_UInt8, queue_size=QUEUE_MAX)
     rospy.loginfo(f"{name}: Online.")
+    
+    '''This allows us to block until a node subscribes'''
     while pub.get_num_connections() < 1:
         rospy.sleep(1)
 
-    # OpenCV
+    # OpenCV Setup
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, IMG_HEIGHT)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, IMG_WIDTH)
@@ -42,24 +52,9 @@ def send_imgs():
             ret, frame = cap.read()
             if not ret:
                 rospy.logwarn(f'Could not grab frame:\n{frame}')
-
-            start =  rospy.get_time()
             msg = encode_rosnp(frame[..., ::-1])  # flip to RGB from BGR
-            """msg = ROSNumpy_UInt16()
-            dtype = frame.dtype.name
-            shape = frame.shape
-            rosnp = frame[..., ::-1].flatten().astype(np.uint16)
-            msg.dtype, msg.shape, msg.rosnp = dtype, shape, rosnp
-            """
             pub.publish(msg)
-            # print(f'Time: {rospy.get_time() - start}')
-            """cv2.imshow('Test', frame)
-            key = cv2.waitKey(1)
-            if key == ord('q'):
-                break
-            """
             rate.sleep()
-
     finally:
         cap.release()
         cv2.destroyAllWindows()

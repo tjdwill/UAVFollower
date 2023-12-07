@@ -1,5 +1,5 @@
+testing: False  # toggle test mode
 detect_thresh: 7
-
 fps: 24  # ss01 Pub Rate
 
 topics:
@@ -7,12 +7,15 @@ topics:
     detections: "detections"
     resume_trigger: "resume_trigger"
     depth_req: "depth_req"
-    waypoints: "waypoints"
     bad_detections: "bad_detections"
+    tf2: "tf2_poll"
 
 frame_data:
     HEIGHT: 480
     WIDTH: 640
+
+ss00_Liaison:
+    depth_topic: "/camera/depth/image_raw"
 
 ss02_Detector:
 # Define the private parameters for ss02.
@@ -22,7 +25,7 @@ ss02_Detector:
         "conf": 0.35
     }
     seek_thresh: 7.  # seconds
-    testing: False
+    debug: False
 
 ss03_DataProcessor:
     debug: False

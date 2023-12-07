@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 import torch
 import rospy
-from rosnp_msgs.msg import ROSNumpy_UInt8, ROSNumpy_UInt16, ROSNumpyList_Float32
+from rosnp_msgs.msg import ROSNumpy_UInt8, ROSNumpyList_Float32
 from rosnp_msgs.rosnp_helpers import decode_rosnp, encode_rosnp_list
 from std_srvs.srv import Empty, EmptyResponse
 
@@ -26,15 +26,18 @@ yolo_defaults = {
     'conf': 0.35
 }
 
+# Define parameters for proper image subscription buffer.
+# Significantly reduces lag
 BUFF_SZ = 2**24  # mebibytes
 SUB_QUEUE_SZ = 1
+
 class UAVDetector:
     """A class for running a YOLOv5 UAV Detection algorithm"""
     
     def __init__(self):
         rospy.init_node('ss02_Detector', log_level=rospy.INFO)
         
-        # Get parameters
+        # Parameter Loading
         self.name = rospy.get_name()
         self.topics: dict = rospy.get_param('topics')
         self.img_info: dict  = rospy.get_param('frame_data')
@@ -43,7 +46,7 @@ class UAVDetector:
         self.SEEK_THRESH: float = rospy.get_param('~seek_thresh', default=7.)  
         self.IMG_HEIGHT: int = self.img_info['HEIGHT']
         self.IMG_WIDTH: int = self.img_info['WIDTH']
-        self.testing = rospy.get_param('~testing', default=False)
+        self.debug = rospy.get_param('~debug', default=False)
         self.window_name = 'JetHexa Live Feed'
         
         # Machine Learning Setup
@@ -75,6 +78,8 @@ class UAVDetector:
             queue_size=SUB_QUEUE_SZ,
             buff_size=BUFF_SZ
         )
+        # Begin a service to allow this object to continue
+        # collecting UAV detections
         self.srv = rospy.Service(
             self.topics['resume_trigger'],
             Empty,
@@ -112,7 +117,7 @@ class UAVDetector:
 
         # Loop through all inference matrix rows
         for detection in xyxyn:
-            conf = detection[4].round(2)
+            conf = detection[4].round(2)  # Why doesn't this round correctly?
             if conf >= self.CONF:
                 detected = True   
                 x1 = (detection[0] * self.IMG_WIDTH).astype(np.uint16)
@@ -141,10 +146,20 @@ class UAVDetector:
     
     def resume(self, req: Empty):
         self.collecting = True
-
         return EmptyResponse() 
     
     def request_seeker(self):
+        """
+        Declaring this for if/when a function must be written to
+        request SEEKING action. The SEEKING action is one in which,
+        after some pre-defined time, the robot makes movements
+        to bring a UAV into view.
+
+        The idea is to monitor how long it's been since a detection,
+        call this function when the threshold is exceeded, and
+        request the action (from a to-be-defined node) to move
+        the robot as needed.
+        """
         ...
 
     def img_callback(self, msg):
@@ -168,7 +183,10 @@ class UAVDetector:
             self.container.clear()
             self.detections = 0
             """
-            'SEEK' ACTION LOGIC HERE 
+            'SEEK' ACTION LOGIC HERE
+            - Keep track of time elapsed since the last detection
+            - Send request to move bot and block until complete
+            ...
             """
         else:
             if self.collecting:
@@ -179,13 +197,14 @@ class UAVDetector:
                     self.detections_pub.publish(rosnp_list_msg)
                     self.container.clear()
                     self.detections = 0
-                    # Halt data collection until signal if *not* in testing mode
-                    if not self.testing:
-                        self.collecting = False
-                    else:    
+                    if self.debug:
                         print(f'{self.name}: Time Elapsed: {rospy.get_time() - start}')
+                    self.collecting = False
+
     def __del__(self):
         cv2.destroyAllWindows()
+
+
 if __name__ == '__main__':
     try:
         ss02 = UAVDetector()
