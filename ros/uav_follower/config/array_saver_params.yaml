@@ -1,0 +1,14 @@
+testing: False  # toggle test mode
+depth_img_count: 7  # Number of depth images to collect.
+fps: 24  # ss01 Pub Rate
+
+topics:
+    img_topic: "RGBHub"
+    depth_req: "depth_req"
+
+frame_data:
+    HEIGHT: 480
+    WIDTH: 640
+
+ss00_Liaison:
+    depth_topic: "/camera/depth/image_raw"
