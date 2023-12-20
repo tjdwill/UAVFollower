@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Dec 20 09:50:46 2023
-
-@author: Tj
-"""
-
-# -*- coding: utf-8 -*-
-"""
 Created on Wed Dec 20 10:17:14 2023
 
 @author: Terrance Williams
