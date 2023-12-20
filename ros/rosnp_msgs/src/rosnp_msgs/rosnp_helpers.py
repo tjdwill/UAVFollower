@@ -183,3 +183,4 @@ def decode_rosnp_list(msg):
 
     result_list = [decode_rosnp(message) for message in msg.rosnp_list]
     return result_list
+

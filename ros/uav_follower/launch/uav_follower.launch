@@ -42,7 +42,6 @@
 			<param name="frame_id" value="$(arg map_frame_id)" />
 			<param name="waypoints" value="/$(arg robot_name)/$(arg waypoints)" />	<!-- Note that it's a global name -->
 		</node>
-
 		<node name="ss04_tf2Watcher" pkg="uav_follower" type="ss04_tf2Watcher.py" output="screen" required="true" unless="$(arg test_mode)">
 			<param name="base_frame" value="$(arg base_frame_id)" />
 			<param name="map_frame" value="$(arg map_frame_id)" />

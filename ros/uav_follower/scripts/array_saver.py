@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*-coding: utf-8 -*-
+
 """
 @author: Terrance Williams
 @title: ArraySaver
@@ -35,7 +36,8 @@ class ArraySaver:
         rospy.init_node("array_saver", log_level=rospy.INFO)
 
         self.name = rospy.get_name()
-        self.dir = Path(rospy.get_param("~log_dir")) / "depth_exp"
+        self.dir = Path(rospy.get_param("~log_dir"))
+        self.dir = self.dir / f"depth_exp_{len(list(self.dir.iterdir())):02d}"
         if not self.dir.is_dir():
             self.dir.mkdir()
         self.depth_count = rospy.get_param("depth_img_count")
@@ -66,7 +68,7 @@ class ArraySaver:
 
     def rgb_callback(self, msg: ROSNumpy_UInt8) -> None:
         img = decode_rosnp(msg)
-        cv2.imshow(self.name, img)
+        cv2.imshow(self.name, img[...,::-1])
         cv2.waitKey(1)
         if self.get_frame:
             self.rgb = img
@@ -98,7 +100,7 @@ class ArraySaver:
                 if not exp_depth >= inf_signal:
                     rospy.logwarn(f"Valid depth values: [-1, ...]\n") 
                     continue
-            except TypeError:
+            except (TypeError, ValueError) as e:
                 print(f"Incorrect value. Please insert a number or enter '{quit}' to exit.\n")
                 continue
 
@@ -130,9 +132,13 @@ class ArraySaver:
             with open(np_file, 'wb') as f:
                 np.save(f, data)
 
+    def __del__(self):
+        cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     try:
         ArraySaver().main()
     except rospy.ROSInterruptException:
         pass
+
