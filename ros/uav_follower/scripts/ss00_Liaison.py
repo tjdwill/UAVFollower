@@ -24,7 +24,7 @@ class NodeLiaison:
         rospy.init_node('ss00_Liaison', log_level=rospy.INFO)
 
         self.name = rospy.get_name()
-        self.testing = rospy.get_param('testing')
+        self.test_mode = rospy.get_param('test_mode')
         topics = rospy.get_param('topics')
         self.depth_req = rospy.Service(
             topics['depth_req'],
@@ -46,7 +46,7 @@ class NodeLiaison:
             self.depth_img_handler
         )
         
-        if self.testing:
+        if self.test_mode:
             # For tests in which we don't want to run the full navigation
             # but still want continuous detections.
             from geometry_msgs.msg import PointStamped

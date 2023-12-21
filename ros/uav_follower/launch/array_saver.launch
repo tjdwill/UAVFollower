@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+
+<launch>
+    <!-- Begin Camera Machinery -->
+	<include file="$(find jethexa_peripherals)/launch/camera.launch"></include>
+    <group ns="uav_array">
+        <rosparam command="load" file="$(find uav_follower)/config/array_saver_params.yaml" />
+
+	<node name="depth_server" pkg="uav_follower" type="ss00_Liaison.py" output="screen" required="true"></node>
+	<node name="photographer" pkg="uav_follower" type="ss01_Photographer.py" output="screen" required="true"></node>
+	<node name="array_saver" pkg="uav_follower" type="array_saver.py" output="screen" required="true">
+		<param name="log_dir" type="string" value="$(find uav_follower)/logs" />
+	</node>
+    </group>
+</launch>
