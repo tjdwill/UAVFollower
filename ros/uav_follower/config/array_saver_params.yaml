@@ -1,4 +1,4 @@
-testing: False  # toggle test mode
+test_mode: False  # toggle test mode
 depth_img_count: 7  # Number of depth images to collect.
 fps: 24  # ss01 Pub Rate
 
@@ -9,6 +9,8 @@ topics:
     resume_trigger: "resume_trigger"
     bad_detections: "bad_detections"
     tf2: "tf2_poll"
+    last_frame: "last_frame"
+    avg_depth: "avg_depth"
 
 frame_data:
     HEIGHT: 480

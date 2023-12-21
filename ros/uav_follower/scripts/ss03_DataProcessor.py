@@ -12,8 +12,8 @@
 from typing import Tuple
 import numpy as np
 import rospy
-from rosnp_msgs.msg import ROSNumpyList_Float32, ROSNumpyList_UInt16
-from rosnp_msgs.rosnp_helpers import decode_rosnp_list
+from rosnp_msgs.msg import ROSNumpyList_Float32, ROSNumpyList_UInt16, ROSNumpy_UInt16
+from rosnp_msgs.rosnp_helpers import decode_rosnp_list, encode_rosnp
 from std_msgs.msg import Header
 from geometry_msgs.msg import Point, PointStamped
 from uav_follower.kmeans import KMeans
@@ -35,7 +35,7 @@ class DataProcessor:
         # Parameter Definitions
         self.name = rospy.get_name()
         self.debug = rospy.get_param('~debug')
-        self.testing = rospy.get_param('testing')
+        self.test_mode = rospy.get_param('test_mode')
         self.COUNT_THRESH = int(0.8 * rospy.get_param('detect_thresh'))
         self.DENSITY_THRESH = rospy.get_param('~density_thresh', default=1.5)
         self.MAX_ACCEL = rospy.get_param('~max_accel', default=5)
@@ -71,7 +71,13 @@ class DataProcessor:
             topics['bad_detections'],
             Empty
         )
-        if not self.testing:
+        if self.test_mode:
+            self.avg_depth_pub = rospy.Publisher(
+                topics['avg_depth'],
+                ROSNumpy_UInt16,
+                queue_size=1
+            )
+        else:
             '''
             Only use this service during production since
             it requires tf2 transforms to be available
@@ -80,6 +86,7 @@ class DataProcessor:
                     topics['tf2'],
                     TF2Poll
             )
+
 
         rospy.loginfo(f"{self.name} Online.")
         rospy.spin()
@@ -429,7 +436,8 @@ class DataProcessor:
                 ]
         else:
             # Perform data collection for depth image investigation
-            if self.testing:
+            if self.test_mode:
+                """
                 from pathlib import Path
                 import time
                 cat = "".join
@@ -445,7 +453,9 @@ class DataProcessor:
                 np_file = sv_dir / cat([timestr, '_depthArray.npy'])
                 with open(np_file, 'wb') as f:
                     np.save(f, region)
-
+                """
+                self.avg_depth_pub.publish(encode_rosnp(avgd_depth_img.astype(np.uint16)))
+                """
                 # Print array and other info to screen
                 with np.printoptions(threshold=np.inf):
                     print(f'Non-zero depth values (mm):\n')
@@ -455,6 +465,8 @@ class DataProcessor:
                     print(f'Non-zero region size: {nonzero_region.shape}\n')
                     print(f'Min Depth (mm) {np.min(nonzero_region)}')
                     print(f'Max Depth (mm) {np.max(nonzero_region)}')
+                """
+                rospy.loginfo(f"{self.name}:\nDepth img Sent.")
         finally:
             if Z_c == 0 or np.isnan(Z_c):
                 rospy.logwarn(f'{self.name}: Invalid Z value {Z_c}.')
@@ -488,7 +500,7 @@ class DataProcessor:
         y_px = np.average(np.array([y_min, y_max]).astype(np.float64))
         body_frame = (Z_c / f_px) * np.array([f_px, cx-x_px, cy-y_px])
         
-        if self.testing:
+        if self.test_mode:
             from geometry_msgs.msg import Vector3
             transln = Vector3(0., 0., 0.)
         else:

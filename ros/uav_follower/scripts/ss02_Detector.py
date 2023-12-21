@@ -16,7 +16,7 @@ import numpy as np
 import torch
 import rospy
 from rosnp_msgs.msg import ROSNumpy_UInt8, ROSNumpyList_Float32
-from rosnp_msgs.rosnp_helpers import decode_rosnp, encode_rosnp_list
+from rosnp_msgs.rosnp_helpers import decode_rosnp, encode_rosnp_list, encode_rosnp
 from std_srvs.srv import Empty, EmptyResponse
 
 
@@ -47,6 +47,7 @@ class UAVDetector:
         self.IMG_HEIGHT: int = self.img_info['HEIGHT']
         self.IMG_WIDTH: int = self.img_info['WIDTH']
         self.debug = rospy.get_param('~debug', default=False)
+        self.test_mode = rospy.get_param('test_mode')
         self.window_name = 'JetHexa Live Feed'
         
         # Machine Learning Setup
@@ -71,6 +72,14 @@ class UAVDetector:
             ROSNumpyList_Float32,
             queue_size=1
         )
+
+        if self.test_mode:
+            self.last_frame_pub = rospy.Publisher(
+                self.topics['last_frame'],
+                ROSNumpy_UInt8,
+                queue_size=1
+            )
+
         self.rgb_sub = rospy.Subscriber(
             self.topics['img_topic'],
             ROSNumpy_UInt8,
@@ -199,6 +208,10 @@ class UAVDetector:
                     self.detections = 0
                     if self.debug:
                         print(f'{self.name}: Time Elapsed: {rospy.get_time() - start}')
+                    # Post last annotated image for saving.
+                    if self.test_mode:
+                        self.last_frame_pub.publish(encode_rosnp(rgb))
+
                     self.collecting = False
 
     def __del__(self):

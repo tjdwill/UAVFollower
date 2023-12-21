@@ -16,7 +16,7 @@ import numpy as np
 
 import rospy
 from rosnp_msgs.rosnp_helpers import decode_rosnp, decode_rosnp_list
-from rosnp_msgs.msg import ROSNumpy_UInt8
+from rosnp_msgs.msg import ROSNumpy_UInt8, ROSNumpy_UInt16
 from uav_follower.srv import DepthImgReq
 
 
@@ -29,42 +29,60 @@ SUB_QUEUE_SZ = 1
 
 class ArraySaver:
     def __init__(self) -> None:
-        self.rgb = np.array([])
+        self.rgb = []
+        self.avg_depth = []
         self.get_frame = False
         
         # ROS setup
         rospy.init_node("array_saver", log_level=rospy.INFO)
 
         self.name = rospy.get_name()
-        self.dir = Path(rospy.get_param("~log_dir"))
-        self.dir = self.dir / f"depth_exp_{len(list(self.dir.iterdir())):02d}"
-        if not self.dir.is_dir():
-            self.dir.mkdir()
+        self.test_mode = rospy.get_param('test_mode')
         self.depth_count = rospy.get_param("depth_img_count")
         topics = rospy.get_param("topics")
         frame_data= rospy.get_param("frame_data")
         self.IMG_HEIGHT = frame_data['HEIGHT']
         self.IMG_WIDTH = frame_data['WIDTH']
+        self.dir = Path(rospy.get_param("~log_dir"))
+        self.dir = self.dir / f"depth_exp_{len(list(self.dir.iterdir())):02d}"
+        if not self.dir.is_dir():
+            self.dir.mkdir()
         
-
         # Set up comms
         ## Subscriber to images
-        self.rgb_sub = rospy.Subscriber(
-            topics['img_topic'],
-            ROSNumpy_UInt8,
-            self.rgb_callback,
-            queue_size = SUB_QUEUE_SZ,
-            buff_size = BUFF_SZ
-        )
+        if not self.test_mode:
+            self.rgb_sub = rospy.Subscriber(
+                topics['img_topic'],
+                ROSNumpy_UInt8,
+                self.rgb_callback,
+                queue_size = SUB_QUEUE_SZ,
+                buff_size = BUFF_SZ
+            )
 
-        ## Service proxy to depth imgs
-        rospy.wait_for_service(topics['depth_req'])
-        self.depth_req = rospy.ServiceProxy(
-            topics['depth_req'],
-            DepthImgReq,
-        )
+            ## Service proxy to depth imgs
+            rospy.wait_for_service(topics['depth_req'])
+            self.depth_req = rospy.ServiceProxy(
+                topics['depth_req'],
+                DepthImgReq,
+            )
+        else:
+            self.rgb_sub = rospy.Subscriber(
+                topics['last_frame'],
+                ROSNumpy_UInt8,
+                self.get_last_frame,
+                queue_size = SUB_QUEUE_SZ,
+                buff_size = BUFF_SZ
+            )
 
-        rospy.loginfo(f"<{self.name}>: Online.")
+            self.avg_depth_sub = rospy.Subscriber(
+                topics['avg_depth'],
+                ROSNumpy_UInt16,
+                self.get_avg_depth,
+                queue_size = SUB_QUEUE_SZ,
+                buff_size = BUFF_SZ
+            )
+
+        rospy.loginfo(f"{self.name}: Online.")
 
     def rgb_callback(self, msg: ROSNumpy_UInt8) -> None:
         img = decode_rosnp(msg)
@@ -74,6 +92,40 @@ class ArraySaver:
             self.rgb = img
             self.get_frame = False
     
+    def get_last_frame(self, msg:ROSNumpy_UInt8):
+        self.rgb = decode_rosnp(msg)
+
+    def get_avg_depth(self, msg:ROSNumpy_UInt16):
+        self.avg_depth = decode_rosnp(msg)
+
+
+    def uav_save(self):
+        ...
+        """
+        Save Avg'd Depth image and last detected UAV frame to file.
+        The last frame may not correlate 1:1 with the location of the depth
+        values due to the UAV's movement. The depth images are requested later
+        in time.
+
+        This is just to get an idea of what readings I'm getting though, so I'm
+        not looking for super precision.
+        """
+        exp_depth = -1  # signal that we don't know the actual depth value.
+        while not rospy.is_shutdown():
+            if (
+                    isinstance(self.rgb, np.ndarray) and
+                    isinstance(self.avg_depth, np.ndarray)
+            ):
+                data = np.array([exp_depth, self.avg_depth, self.rgb], dtype=np.ndarray)
+                timestr = time.strftime("%Y%m%d-%H%M%S")
+                np_file = self.dir / cat([timestr, f"UAVDepth_{exp_depth}cm.npy"])
+                with open(np_file, 'wb') as f:
+                    np.save(f, data)
+                
+                self.avg_depth = []
+                self.rgb = []
+
+
     def main(self):
         """
         * Get user input
@@ -138,7 +190,11 @@ class ArraySaver:
 
 if __name__ == "__main__":
     try:
-        ArraySaver().main()
+        arr_sav = ArraySaver()
+        if arr_sav.test_mode:
+            arr_sav.uav_save()
+        else:
+            arr_sav.main()
     except rospy.ROSInterruptException:
         pass
 
