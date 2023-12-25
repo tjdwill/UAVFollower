@@ -21,6 +21,8 @@ from uav_follower.srv import DepthImgReq, TF2Poll
 from std_srvs.srv import Empty
 
 
+MAX_DEPTH = 1000  # mm Experimentally determined
+
 class DataProcessor:
     """
     Performs multiple tasks to process the detections and ultimately produce
@@ -420,7 +422,7 @@ class DataProcessor:
             ]
             # '0' is an invalid value for OpenNI depth images; remove them
             nonzero_region = region[region != 0]
-            Z_c = np.average(nonzero_region)
+            Z_c = np.min(nonzero_region)
         except IndexError:
             # Couldn't average the bounding box depth values;
             # Log error and use center point depth instead
@@ -437,38 +439,10 @@ class DataProcessor:
         else:
             # Perform data collection for depth image investigation
             if self.test_mode:
-                """
-                from pathlib import Path
-                import time
-                cat = "".join
-
-                # Save Numpy array to file
-                sv_dir = Path('/home/hiwonder/test_ws/src/uav_follower/logs')
-                if not sv_dir.is_dir():
-                    sv_dir.mkdir()
-
-                timestr = time.strftime("%Y%m%d-%H%M%S")
-                print(type(timestr))
-                print(timestr)
-                np_file = sv_dir / cat([timestr, '_depthArray.npy'])
-                with open(np_file, 'wb') as f:
-                    np.save(f, region)
-                """
                 self.avg_depth_pub.publish(encode_rosnp(avgd_depth_img.astype(np.uint16)))
-                """
-                # Print array and other info to screen
-                with np.printoptions(threshold=np.inf):
-                    print(f'Non-zero depth values (mm):\n')
-                    for row in nonzero_region:
-                        print(row)
-                    print(f'\nFull Averaged Depth values size:\n{region.shape}\n')
-                    print(f'Non-zero region size: {nonzero_region.shape}\n')
-                    print(f'Min Depth (mm) {np.min(nonzero_region)}')
-                    print(f'Max Depth (mm) {np.max(nonzero_region)}')
-                """
                 rospy.loginfo(f"{self.name}:\nDepth img Sent.")
         finally:
-            if Z_c == 0 or np.isnan(Z_c):
+            if Z_c == 0 or np.isnan(Z_c) or Z_c > MAX_DEPTH:
                 rospy.logwarn(f'{self.name}: Invalid Z value {Z_c}.')
                 return None
             else:
