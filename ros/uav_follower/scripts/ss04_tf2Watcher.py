@@ -14,7 +14,7 @@ from __future__ import print_function
 
 import rospy
 import tf2_ros
-from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Transform
 from uav_follower.srv import TF2Poll, TF2PollResponse
 
 """
@@ -42,27 +42,28 @@ class tf2Watcher:
         rospy.spin()
 
     def response(self, *args, **kwargs):
-        """Get transform, extract Vector3, send in response"""
+        """Get transform, send in response"""
         resp = TF2PollResponse()
         try:
+            # Get TransformStamped msg
             current_transf = self.tfBuffer.lookup_transform(
                 self.map_frame, 
                 self.base_frame,
                 rospy.Time.now(),
                 rospy.Duration(1.25)
             )
-        except (tf2_ros.LookupException,
-                tf2_ros.ConnectivityException, 
-                tf2_ros.ExtrapolationException):
+        except (
+            tf2_ros.LookupException,
+            tf2_ros.ConnectivityException, 
+            tf2_ros.ExtrapolationException
+        ):
             resp.successful = False
-            resp.translation = Vector3()
+            resp.transform = Transform()
             # what are messages initialized as?            
         else:
-            print("<{}>: current_transf".format(self.name))
-            translation = current_transf.transform.translation
-            assert(isinstance(translation, Vector3))
+            # print("<{}>: current_transf".format(self.name))
             resp.successful = True
-            resp.translation = translation
+            resp.transform = current_transf.transform
         return resp
 
 

@@ -1,3 +1,3 @@
 ---
-geometry_msgs/Vector3 translation
+geometry_msgs/Transform transform
 bool successful

@@ -374,7 +374,7 @@ class DataProcessor:
     def pointstamped_from_imgcoord(
             self,
             normalized_bbox_coordinates: np.ndarray
-            ):
+    ):
         """
         Generate a PointStamped message from normalized
         bounding box coordinates
@@ -384,6 +384,8 @@ class DataProcessor:
             2. Back project depth region and (x, y) into proper coord frame. 
             3. Create and return PointStamped message of the waypoint
         """
+
+        follow_dist = rospy.get_param("follow_dist")
 
         # ===============
         # Obtain Z Value
@@ -475,8 +477,9 @@ class DataProcessor:
         body_frame = (Z_c / f_px) * np.array([f_px, cx-x_px, cy-y_px])
         
         if self.test_mode:
-            from geometry_msgs.msg import Vector3
+            from geometry_msgs.msg import Vector3, Quaternion
             transln = Vector3(0., 0., 0.)
+            quat = Quaternion(0, 0, 0, 1);
         else:
             # Request tf2 Data (TF2PollResponse msg)
             tf2_resp = self.tf2_req()
@@ -484,11 +487,21 @@ class DataProcessor:
                 rospy.logwarn(f'{self.name}: Could not get transform.')
                 return None
             else:
-                transln = tf2_resp.translation
+                transln = tf2_resp.transform.translation
+                quat = tf2_resp.transform.rotation
                 rospy.loginfo(f'{self.name} Received Transform (map->base_link):\n{transln}\n')
         
+        """
+        TODO: Account for orientation. 
+        I want to transform the calculated
+        displacement from body to map coordinates to calculate the correct
+        desired map point.
+
+        I should reverse the rotation transformation on the body_frame vector
+        to convert it to map coordinates.
+        """
         point_msg = Point()
-        point_msg.x = body_frame[0] + transln.x
+        point_msg.x = (body_frame[0] - follow_dist) + transln.x
         point_msg.y = body_frame[1] + transln.y
         point_msg.z = body_frame[2] + transln.z
         
