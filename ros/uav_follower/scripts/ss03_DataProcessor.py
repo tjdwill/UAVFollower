@@ -97,7 +97,8 @@ class DataProcessor:
     def process_detections(
             self,
             xyxyn_container: ROSNumpyList_Float32,
-            ndim:int=6) -> Tuple[dict]:
+            ndim:int=6
+    ) -> Tuple[dict]:
         """
         Sanitizes data to be compatible for KMeans Clustering.
 
@@ -202,7 +203,8 @@ class DataProcessor:
     def filter_clusters(
             self,
             clusters: dict,
-            centroids: np.ndarray) -> dict:
+            centroids: np.ndarray
+    ) -> dict:
         """
         Remove clusters that are likely not valid detections.
 
@@ -375,7 +377,7 @@ class DataProcessor:
     def pointstamped_from_imgcoord(
             self,
             normalized_bbox_coordinates: np.ndarray
-    ):
+    ) -> PointStamped:
         """
         Generate a PointStamped message from normalized
         bounding box coordinates
@@ -533,7 +535,7 @@ class DataProcessor:
             point=point_msg
         ) 
     
-    def detections_callback(self, detections_msg: ROSNumpyList_Float32):
+    def detections_callback(self, detections_msg: ROSNumpyList_Float32) -> None:
         """
         This is the main function of the node.
         It coordinates the other methods.
