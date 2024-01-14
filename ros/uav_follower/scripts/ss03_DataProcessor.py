@@ -475,7 +475,8 @@ class DataProcessor:
         x_px = np.average(np.array([x_min, x_max]).astype(np.float64))
         y_px = np.average(np.array([y_min, y_max]).astype(np.float64))
         body_frame = (Z_c / f_px) * np.array([f_px, cx-x_px, cy-y_px])
-        
+        displacement = body_frame
+        displacement[0] -= follow_dist
         if self.test_mode:
             from geometry_msgs.msg import Vector3, Quaternion
             transln = Vector3(0., 0., 0.)
@@ -489,21 +490,38 @@ class DataProcessor:
             else:
                 transln = tf2_resp.transform.translation
                 quat = tf2_resp.transform.rotation
-                rospy.loginfo(f'{self.name} Received Transform (map->base_link):\n{transln}\n')
+                rospy.loginfo(f'{self.name} Received Transform (map->base_link):\n{transln}\n{quat}\n')
         
         """
-        TODO: Account for orientation. 
+        Account for orientation. 
         I want to transform the calculated
-        displacement from body to map coordinates to calculate the correct
-        desired map point.
+        displacement from body_frame to map coordinates to calculate the correct
+        target map point.
 
         I should reverse the rotation transformation on the body_frame vector
         to convert it to map coordinates.
+
+        Quaternion Matrix from Szeliski `Computer Vision - Algoirthms and
+        Applications (2nd ed.)` pg.39
         """
+        qx = quat.x
+        qy = quat.y
+        qz = quat.z
+        qw = quat.w
+        R = np.array([
+            [1-2*(qy**2 + qz**2), 2*(qx*qy - qz*qw), 2*(qx*qz + qy*qw)],
+            [2*(qx*qy + qz*qw), 1-2*(qx**2 - qz**2), 2*(qy*qz - qx*qw)],
+            [2*(qx*qz - qy*qw), 2*(qy*qz + qx*qw), 1-2*(qx**2 + qy**2)],
+        ])
+        # Convert to map coordinates
+        displacement = np.linalg.inv(R) @ displacement
+        print("QUATERNION REVERSE: ", R)
+        print(f"Calculated Displacement: {displacement}")
+
         point_msg = Point()
-        point_msg.x = (body_frame[0] - follow_dist) + transln.x
-        point_msg.y = body_frame[1] + transln.y
-        point_msg.z = body_frame[2] + transln.z
+        point_msg.x = displacement[0] + transln.x
+        point_msg.y = displacement[1] + transln.y
+        point_msg.z = displacement[2] + transln.z
         
         rospy.loginfo(f'{self.name}: Point msg:\n{point_msg}')
         if self.debug:
