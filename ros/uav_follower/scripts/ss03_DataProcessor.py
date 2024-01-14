@@ -2,7 +2,8 @@
 # -*-coding: utf-8-*-
 """
 @author: Terrance Williams
-@date: 7 November 2023
+@creation_date: 7 November 2023
+@last_edited: 13 January 2024
 @description:
     This program defines the node for the Data Processor that processes
     bounding boxes, calculates centers, performs k-means clustering and more.
