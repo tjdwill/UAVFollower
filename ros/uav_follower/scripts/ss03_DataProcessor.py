@@ -3,7 +3,7 @@
 """
 @author: Terrance Williams
 @creation_date: 7 November 2023
-@last_edited: 13 January 2024
+@lat_edited: 14 January 2024
 @description:
     This program defines the node for the Data Processor that processes
     bounding boxes, calculates centers, performs k-means clustering and more.
@@ -16,7 +16,7 @@ import rospy
 from rosnp_msgs.msg import ROSNumpyList_Float32, ROSNumpyList_UInt16, ROSNumpy_UInt16
 from rosnp_msgs.rosnp_helpers import decode_rosnp_list, encode_rosnp
 from std_msgs.msg import Header
-from geometry_msgs.msg import Point, PointStamped
+from geometry_msgs.msg import Point, PointStamped, PoseStamped, Quaternion
 from uav_follower.kmeans import KMeans
 from uav_follower.srv import DepthImgReq, TF2Poll
 from std_srvs.srv import Empty
@@ -374,7 +374,7 @@ class DataProcessor:
                     rospy.loginfo(f"VOTE: Upset! Winner decided by point count' Cluster {spindex}")
             return winner
     
-    def pointstamped_from_imgcoord(
+    def mapcoord_from_imgcoord(
             self,
             normalized_bbox_coordinates: np.ndarray
     ) -> PointStamped:
@@ -387,9 +387,8 @@ class DataProcessor:
             2. Back project depth region and (x, y) into proper coord frame. 
             3. Create and return PointStamped message of the waypoint
         """
-
-        follow_dist = rospy.get_param("follow_dist")
-
+        
+        follow_dist = rospy.get_param("follow_distance")
         # ===============
         # Obtain Z Value
         # ===============
@@ -428,6 +427,7 @@ class DataProcessor:
             # '0' is an invalid value for OpenNI depth images; remove them
             nonzero_region = region[region != 0]
             Z_c = np.min(nonzero_region)
+            # Z_c = np.average(nonzero_region)  # For box test REMOVE LATER
         except IndexError:
             # Couldn't average the bounding box depth values;
             # Log error and use center point depth instead
@@ -476,10 +476,11 @@ class DataProcessor:
         body_frame = (Z_c / f_px) * np.array([f_px, cx-x_px, cy-y_px])
         displacement = body_frame
         displacement[0] -= follow_dist
+        
         if self.test_mode:
-            from geometry_msgs.msg import Vector3, Quaternion
+            from geometry_msgs.msg import Vector3
             transln = Vector3(0., 0., 0.)
-            quat = Quaternion(0, 0, 0, 1);
+            quat = Quaternion(0., 0., 0., 1.)
         else:
             # Request tf2 Data (TF2PollResponse msg)
             tf2_resp = self.tf2_req()
@@ -489,10 +490,12 @@ class DataProcessor:
             else:
                 transln = tf2_resp.transform.translation
                 quat = tf2_resp.transform.rotation
-                rospy.loginfo(f'{self.name} Received Transform (map->base_link):\n{transln}\n{quat}\n')
-        
+                rospy.loginfo(
+                    f'{self.name} Received Transform (map->base_link):\n'
+                    f'{transln}\n{quat}\n'
+                )
         """
-        Account for orientation. 
+        Account for orientation.
         I want to transform the calculated
         displacement from body_frame to map coordinates to calculate the correct
         target map point.
@@ -512,9 +515,11 @@ class DataProcessor:
             [2*(qx*qy + qz*qw), 1-2*(qx**2 - qz**2), 2*(qy*qz - qx*qw)],
             [2*(qx*qz - qy*qw), 2*(qy*qz + qx*qw), 1-2*(qx**2 + qy**2)],
         ])
+        print("QUATERNION MATRIX:\n", R)
         # Convert to map coordinates
-        displacement = np.linalg.inv(R) @ displacement
-        print("QUATERNION REVERSE: ", R)
+        # R = np.eye(3)
+        # displacement = np.linalg.inv(R) @ displacement
+        displacement = R @ displacement
         print(f"Calculated Displacement: {displacement}")
 
         point_msg = Point()
@@ -525,12 +530,12 @@ class DataProcessor:
         rospy.loginfo(f'{self.name}: Point msg:\n{point_msg}')
         if self.debug:
             print(f'UAV Detected: {body_frame}')
-
+            
         header = Header(
             frame_id=self.frame_id,
             stamp=rospy.Time.now()
         )
-            
+
         return PointStamped(
             header=header,
             point=point_msg
@@ -556,7 +561,7 @@ class DataProcessor:
         """
         Run depth image processing here output PointStamped message
         """
-        waypoint = self.pointstamped_from_imgcoord(uav_xyxyn)
+        waypoint = self.mapcoord_from_imgcoord(uav_xyxyn)
         if waypoint is None:
             self.bad_detect_req()
             return
@@ -567,3 +572,4 @@ if __name__ == '__main__':
         DataProcessor()
     except rospy.ROSInterruptException:
         pass
+
