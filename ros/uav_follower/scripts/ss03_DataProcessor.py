@@ -457,10 +457,6 @@ class DataProcessor:
         # =====================
         # Craft output message
         # =====================
-        header = Header(
-            frame_id=self.frame_id,
-            stamp=rospy.Time.now()
-        )
         # Calculate body-frame vector
         """
         The conversion from body-frame to image frame is:
@@ -529,6 +525,11 @@ class DataProcessor:
         rospy.loginfo(f'{self.name}: Point msg:\n{point_msg}')
         if self.debug:
             print(f'UAV Detected: {body_frame}')
+
+        header = Header(
+            frame_id=self.frame_id,
+            stamp=rospy.Time.now()
+        )
             
         return PointStamped(
             header=header,
