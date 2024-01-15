@@ -94,7 +94,7 @@
 		</include>
 
 		<!-- multi-point navigation -->
-		<node pkg="jethexa_navigation" type="publish_point.py" name="publish_point" output="screen">
+		<node pkg="uav_follower" type="publish_goal.py" name="publish_goal" output="screen">
 			<param name="map_frame" value="$(arg map_frame_id)" />
 			<param name="clicked_point" value="$(arg clicked_point)" />
 			<param name="move_base_result" value="$(arg move_base_result)" />

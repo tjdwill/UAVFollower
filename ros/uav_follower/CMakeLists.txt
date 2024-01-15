@@ -172,6 +172,7 @@ catkin_install_python(
   scripts/ss03_DataProcessor.py
   scripts/ss04_tf2Watcher.py
   scripts/array_saver.py
+  scripts/publish_goal.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

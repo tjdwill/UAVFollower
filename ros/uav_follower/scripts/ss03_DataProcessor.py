@@ -16,7 +16,7 @@ import rospy
 from rosnp_msgs.msg import ROSNumpyList_Float32, ROSNumpyList_UInt16, ROSNumpy_UInt16
 from rosnp_msgs.rosnp_helpers import decode_rosnp_list, encode_rosnp
 from std_msgs.msg import Header
-from geometry_msgs.msg import Point, PointStamped, PoseStamped, Quaternion
+from geometry_msgs.msg import Point, PointStamped, PoseStamped, Quaternion, Pose
 from uav_follower.kmeans import KMeans
 from uav_follower.srv import DepthImgReq, TF2Poll
 from std_srvs.srv import Empty
@@ -61,7 +61,7 @@ class DataProcessor:
         
         self.waypoint_pub = rospy.Publisher(
             waypoints_topic,
-            PointStamped,
+            PoseStamped,
             queue_size=1
         )
         ## Services 
@@ -377,7 +377,7 @@ class DataProcessor:
     def mapcoord_from_imgcoord(
             self,
             normalized_bbox_coordinates: np.ndarray
-    ) -> PointStamped:
+    ) -> PoseStamped:
         """
         Generate a PointStamped message from normalized
         bounding box coordinates
@@ -476,6 +476,8 @@ class DataProcessor:
         body_frame = (Z_c / f_px) * np.array([f_px, cx-x_px, cy-y_px])
         displacement = body_frame
         displacement[0] -= follow_dist
+
+        # TODO: Incorporate Angular Displacement to center UAV in the frame.
         
         if self.test_mode:
             from geometry_msgs.msg import Vector3
@@ -527,18 +529,21 @@ class DataProcessor:
         point_msg.y = displacement[1] + transln.y
         point_msg.z = displacement[2] + transln.z
         
-        rospy.loginfo(f'{self.name}: Point msg:\n{point_msg}')
+        pose_msg = Pose(position=point_msg, orientation=quat)
+        rospy.loginfo(f'{self.name}: Pose msg:\n{pose_msg}')
         if self.debug:
-            print(f'UAV Detected: {body_frame}')
+            current_pos = np.array([transln.x, transln.y, transln.z])
+            target_pt = displacement + current_pos
+            print(f'UAV Detected: {target_pt}')
             
         header = Header(
             frame_id=self.frame_id,
             stamp=rospy.Time.now()
         )
 
-        return PointStamped(
+        return PoseStamped(
             header=header,
-            point=point_msg
+            pose=pose_msg
         ) 
     
     def detections_callback(self, detections_msg: ROSNumpyList_Float32) -> None:
@@ -572,4 +577,5 @@ if __name__ == '__main__':
         DataProcessor()
     except rospy.ROSInterruptException:
         pass
+
 
