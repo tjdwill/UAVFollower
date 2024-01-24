@@ -1,6 +1,7 @@
 test_mode: False  # toggle test mode
 depth_img_count: 7  # Number of depth images to collect.
 fps: 24  # ss01 Pub Rate
+follow_distance: 0.2 # meters
 
 topics:
     img_topic: "RGBHub"

@@ -2,7 +2,8 @@
 # -*-coding: utf-8-*-
 """
 @author: Terrance Williams
-@date: 7 November 2023
+@creation_date: 7 November 2023
+@last_edited: 24 January 2024
 @description:
     This program defines the node for the Data Processor that processes
     bounding boxes, calculates centers, performs k-means clustering and more.
@@ -15,7 +16,7 @@ import rospy
 from rosnp_msgs.msg import ROSNumpyList_Float32, ROSNumpyList_UInt16, ROSNumpy_UInt16
 from rosnp_msgs.rosnp_helpers import decode_rosnp_list, encode_rosnp
 from std_msgs.msg import Header
-from geometry_msgs.msg import Point, PointStamped
+from geometry_msgs.msg import Point, PointStamped, PoseStamped, Quaternion, Pose
 from uav_follower.kmeans import KMeans
 from uav_follower.srv import DepthImgReq, TF2Poll
 from std_srvs.srv import Empty
@@ -60,7 +61,7 @@ class DataProcessor:
         
         self.waypoint_pub = rospy.Publisher(
             waypoints_topic,
-            PointStamped,
+            PoseStamped,
             queue_size=1
         )
         ## Services 
@@ -96,7 +97,8 @@ class DataProcessor:
     def process_detections(
             self,
             xyxyn_container: ROSNumpyList_Float32,
-            ndim:int=6) -> Tuple[dict]:
+            ndim:int=6
+    ) -> Tuple[dict]:
         """
         Sanitizes data to be compatible for KMeans Clustering.
 
@@ -201,7 +203,8 @@ class DataProcessor:
     def filter_clusters(
             self,
             clusters: dict,
-            centroids: np.ndarray) -> dict:
+            centroids: np.ndarray
+    ) -> dict:
         """
         Remove clusters that are likely not valid detections.
 
@@ -371,10 +374,10 @@ class DataProcessor:
                     rospy.loginfo(f"VOTE: Upset! Winner decided by point count' Cluster {spindex}")
             return winner
     
-    def pointstamped_from_imgcoord(
+    def mapcoord_from_imgcoord(
             self,
             normalized_bbox_coordinates: np.ndarray
-            ):
+    ) -> PoseStamped:
         """
         Generate a PointStamped message from normalized
         bounding box coordinates
@@ -384,16 +387,90 @@ class DataProcessor:
             2. Back project depth region and (x, y) into proper coord frame. 
             3. Create and return PointStamped message of the waypoint
         """
-
-        # ===============
-        # Obtain Z Value
-        # ===============
-        '''Average Z values for the bounding box region'''
-        # Have values be uint16 for slicing. Convert later
         x_min = (normalized_bbox_coordinates[0] * self.IMG_WIDTH).astype(np.uint16)
         y_min = (normalized_bbox_coordinates[1] * self.IMG_HEIGHT).astype(np.uint16)
         x_max = (normalized_bbox_coordinates[2] * self.IMG_WIDTH).astype(np.uint16)
         y_max = (normalized_bbox_coordinates[3] * self.IMG_HEIGHT).astype(np.uint16)
+        bbox_coords = np.array([x_min, y_min, x_max, y_max])
+
+        Z_c = self._get_depth_val(bbox_coords)
+        if not Z_c.size:
+            return None
+        
+        x_px = np.average(np.array([x_min, x_max]).astype(np.float64))
+        y_px = np.average(np.array([y_min, y_max]).astype(np.float64))
+
+        body_frame_translation, q1 = self._get_transform(
+            np.array([x_px, y_px, Z_c])
+        )
+
+        print(
+            f"Displacement transform:\nTranslation:\t{body_frame_translation}"
+            f"\nQuaternion:\t{q1}"
+        )
+        # =====================
+        # Craft output message
+        # =====================
+        
+        if self.test_mode:
+            from geometry_msgs.msg import Vector3
+            transln = Vector3(0., 0., 0.)
+            q0 = Quaternion(0., 0., 0., 1.)
+        else:
+            # Request tf2 Data (TF2PollResponse msg)
+            tf2_resp = self.tf2_req()
+            if not tf2_resp.successful:
+                rospy.logwarn(f'{self.name}: Could not get transform.')
+                return None
+            else:
+                transln = tf2_resp.transform.translation
+                q0 = tf2_resp.transform.rotation
+                rospy.loginfo(
+                    f'{self.name} Received Transform (map->base_link):\n'
+                    f'{transln}\n{q0}\n'
+                )
+        # Apply the rotations in reverse (disp, then robot's current orientation)
+        q = self._quat_product(q0, q1)
+        R = self._get_quaternion_matrix(q)
+        print("QUATERNION MATRIX:\n", R)
+
+        # Convert to map coordinates
+        displacement = R @ body_frame_translation
+        print(f"Calculated Displacement: {displacement}")
+
+        point_msg = Point()
+        point_msg.x = transln.x + displacement[0]
+        point_msg.y = transln.y + displacement[1]
+        point_msg.z = transln.z + displacement[2]
+        
+        quat = Quaternion(*q)
+        pose_msg = Pose(position=point_msg, orientation=quat)
+        rospy.loginfo(f'{self.name}: Pose msg:\n{pose_msg}')
+        if self.debug:
+            current_pos = np.array([transln.x, transln.y, transln.z])
+            target_pt = displacement + current_pos
+            print(f'UAV Detected: {target_pt}')
+            
+        header = Header(
+            frame_id=self.frame_id,
+            stamp=rospy.Time.now()
+        )
+
+        return PoseStamped(
+            header=header,
+            pose=pose_msg
+        ) 
+    
+    
+    def _get_depth_val(self, bbox: np.ndarray) -> np.ndarray:
+        """
+        Average Z values for the bounding box region
+        
+        Input:
+            - normalized bbox coords: np.ndarray
+        """
+        # Have values be uint16 for slicing. Convert later
+        x_min, y_min, x_max, y_max = bbox
         
         rospy.loginfo(f"<{self.name}> Calculated BBox coords: {x_min}, {y_min}, {x_max}, {y_max})")
         
@@ -423,6 +500,7 @@ class DataProcessor:
             # '0' is an invalid value for OpenNI depth images; remove them
             nonzero_region = region[region != 0]
             Z_c = np.min(nonzero_region)
+            # Z_c = np.average(nonzero_region)  # For box test REMOVE LATER
         except IndexError:
             # Couldn't average the bounding box depth values;
             # Log error and use center point depth instead
@@ -444,18 +522,26 @@ class DataProcessor:
         finally:
             if Z_c == 0 or np.isnan(Z_c) or Z_c > MAX_DEPTH:
                 rospy.logwarn(f'{self.name}: Invalid Z value {Z_c}.')
-                return None
+                return np.array([])
             else:
                 Z_c = Z_c / 1000  # convert to meters
                 rospy.loginfo(f'{self.name}: Averaged Z_val (m): {Z_c}')
+                return Z_c
+    
+    def _get_transform(self, img_coords: np.ndarray) -> tuple:
+        """
+            Returns the calculated transform to the detected UAV
+        
+            Returns:
+                displacement: np.ndarray
+                    Usual [x,y,z] format
+                rotation: np.ndarray 
+                    A quaternion
+        """
+        x_px, y_px, Z_c = img_coords
+        displacement = np.array([0, 0, 0])
+        rotation = np.array([0, 0, 0, 1])
 
-        # =====================
-        # Craft output message
-        # =====================
-        header = Header(
-            frame_id=self.frame_id,
-            stamp=rospy.Time.now()
-        )
         # Calculate body-frame vector
         """
         The conversion from body-frame to image frame is:
@@ -467,41 +553,93 @@ class DataProcessor:
         The formula is body_frame = [x, y, z]^T 
         = (Z_c / f_px)*[f_px, -x_px, -y_px]^T
         """
+        follow_dist = rospy.get_param("follow_distance")
         # Intrinsic Camera Parameters for back projection
         cx, cy = self.cx, self.cy
         f_px = self.f_px
-        x_px = np.average(np.array([x_min, x_max]).astype(np.float64))
-        y_px = np.average(np.array([y_min, y_max]).astype(np.float64))
         body_frame = (Z_c / f_px) * np.array([f_px, cx-x_px, cy-y_px])
-        
-        if self.test_mode:
-            from geometry_msgs.msg import Vector3
-            transln = Vector3(0., 0., 0.)
-        else:
-            # Request tf2 Data (TF2PollResponse msg)
-            tf2_resp = self.tf2_req()
-            if not tf2_resp.successful:
-                rospy.logwarn(f'{self.name}: Could not get transform.')
-                return None
-            else:
-                transln = tf2_resp.translation
-                rospy.loginfo(f'{self.name} Received Transform (map->base_link):\n{transln}\n')
-        
-        point_msg = Point()
-        point_msg.x = body_frame[0] + transln.x
-        point_msg.y = body_frame[1] + transln.y
-        point_msg.z = body_frame[2] + transln.z
-        
-        rospy.loginfo(f'{self.name}: Point msg:\n{point_msg}')
-        if self.debug:
-            print(f'UAV Detected: {body_frame}')
-            
-        return PointStamped(
-            header=header,
-            point=point_msg
-        ) 
+        displacement = np.copy(body_frame)
+        displacement[0] -= follow_dist
+
+        # Quaternion calculation
+        """
+            The axis of rotation is the z-axis, which is the same directionally
+            in the map and body frames.
+
+            I use the dot product between the projection of displacement vector
+            onto the xy-plane, v, and the
+            body-frame x-axis, u, to find the rotation angle
+
+            v = <x, y, 0>
+            u = <1, 0, 0>
+            cos{theta} = (u . v)/(||u|| ||v||)
+                = (x)/||v||  
+            |theta| = arccos(x/sqrt(x^{2} + y^{2}))
+
+            From there, I calculate the quaternion knowing the rotation is
+            about the z-axis.
+        """
+        disp_xproj = np.copy(body_frame)
+        disp_xproj[-1] = 0.
+
+        v_x, v_y, _ = disp_xproj
+        # the denom is never 0 because x will always be non-zero when used in
+        # this program; no check necessary
+        theta = np.arccos(v_x/np.linalg.norm(disp_xproj)) 
+        if v_y < 0:
+            theta *= -1
+        print(f"Calculated theta: {np.degrees(theta)}") 
+        # Convert quaternion message to ndarray; Doing it this way ensures the
+        # array is ordered correctly.
+        rotation = Quaternion()
+        rotation.x = 0
+        rotation.y = 0
+        rotation.z = np.sin(theta/2)
+        rotation.w = np.cos(theta/2)
+
+        return displacement, self._np_quat(rotation)
     
-    def detections_callback(self, detections_msg: ROSNumpyList_Float32):
+    def _get_quaternion(self, angle: float, direction_vector: np.ndarray) -> np.ndarray:
+        """Assumes angle input is in radians"""
+        ...
+
+    def _get_quaternion_matrix(self, quaternion=np.array([0,0,0,1])):
+        
+        # Quaternion Matrix from Szeliski `Computer Vision - Algoirthms and
+        # Applications (2nd ed.)` pg.39
+        
+        if isinstance(quaternion, Quaternion):
+            quaternion = self._np_quat(quaternion)
+        qx, qy, qz, qw = quaternion
+        R_mat = np.array([
+            [1-2*(qy**2 + qz**2), 2*(qx*qy - qz*qw), 2*(qx*qz + qy*qw)],
+            [2*(qx*qy + qz*qw), 1-2*(qx**2 + qz**2), 2*(qy*qz - qx*qw)],
+            [2*(qx*qz - qy*qw), 2*(qy*qz + qx*qw), 1-2*(qx**2 + qy**2)],
+        ])
+        return R_mat
+    
+    def _quat_product(self, q1, q0) -> np.ndarray:
+        """A quaternion that represents the rotation about q0 followed by q1"""
+        if isinstance(q1, Quaternion):
+            q1 = self._np_quat(q1)
+        if isinstance(q0, Quaternion):
+            q0 = self._np_quat(q0)
+
+        x1, y1, z1, w1 = q1
+        x0, y0, z0, w0 = q0
+
+        w = w1*w0 - x1*x0 - y1*y0 - z1*z0
+        x = w1*x0 + x1*w0 + y1*z0 - z1*y0
+        y = w1*y0 - x1*z0 + y1*w0 + z1*x0
+        z = w1*z0 + x1*y0 - y1*x0 + z1*w0
+
+        return np.array([x, y, z, w])
+    
+    @staticmethod
+    def _np_quat(q: Quaternion) -> np.ndarray:
+        return np.array([q.x, q.y, q.z, q.w])
+
+    def detections_callback(self, detections_msg: ROSNumpyList_Float32) -> None:
         """
         This is the main function of the node.
         It coordinates the other methods.
@@ -521,14 +659,16 @@ class DataProcessor:
         """
         Run depth image processing here output PointStamped message
         """
-        waypoint = self.pointstamped_from_imgcoord(uav_xyxyn)
+        waypoint = self.mapcoord_from_imgcoord(uav_xyxyn)
         if waypoint is None:
             self.bad_detect_req()
             return
         self.waypoint_pub.publish(waypoint)
-    
+
+
 if __name__ == '__main__':
     try:
         DataProcessor()
     except rospy.ROSInterruptException:
         pass
+
