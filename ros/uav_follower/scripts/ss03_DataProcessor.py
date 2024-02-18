@@ -22,7 +22,7 @@ from uav_follower.srv import DepthImgReq, TF2Poll
 from std_srvs.srv import Empty
 
 
-MAX_DEPTH = 1000  # mm Experimentally determined
+MAX_DEPTH = 3000  # mm Experimentally determined
 
 class DataProcessor:
     """
@@ -42,6 +42,7 @@ class DataProcessor:
         self.COUNT_THRESH = int(0.8 * rospy.get_param('detect_thresh'))
         self.DENSITY_THRESH = rospy.get_param('~density_thresh', default=1.5)
         self.MAX_ACCEL = rospy.get_param('~max_accel', default=5)
+        self.DEPTH_IMG_COUNT = rospy.get_param('depth_img_count')
         topics = rospy.get_param('topics')
         waypoints_topic = rospy.get_param('~waypoints')  # launch file
         self.frame_id = rospy.get_param('~frame_id')  # launch file
@@ -469,13 +470,15 @@ class DataProcessor:
         Input:
             - normalized bbox coords: np.ndarray
         """
+        RETURN_ERROR = np.array([])
+
         # Have values be uint16 for slicing. Convert later
         x_min, y_min, x_max, y_max = bbox
         
         rospy.loginfo(f"<{self.name}> Calculated BBox coords: {x_min}, {y_min}, {x_max}, {y_max})")
         
         # Retrieve and convert depth images
-        num_imgs: int = 3
+        num_imgs: int = self.DEPTH_IMG_COUNT
         depth_imgs_msg = self.depth_req(num_imgs)
         depth_imgs = decode_rosnp_list(depth_imgs_msg.depth_imgs)
         assert num_imgs == len(depth_imgs)
@@ -492,37 +495,28 @@ class DataProcessor:
         # Select bbox region and average values to get the average Z val
         slice_y = slice((y_min + 1), y_max)
         slice_x = slice((x_min + 1), x_max)
+        region = avgd_depth_img[
+                slice_y,
+                slice_x,
+        ]
         try:
-            region = avgd_depth_img[
-                    slice_y,
-                    slice_x,
-            ]
             # '0' is an invalid value for OpenNI depth images; remove them
             nonzero_region = region[region != 0]
             Z_c = np.min(nonzero_region)
             # Z_c = np.average(nonzero_region)  # For box test REMOVE LATER
-        except IndexError:
-            # Couldn't average the bounding box depth values;
-            # Log error and use center point depth instead
-            rospy.logwarn(
-                (f'Index Error; Img_size: {avgd_depth_img.shape}\n'
-                'Slice index: '
-                f'[{slice_y}, '
-                f'{slice_x}]')
-            )
-            Z_c = avgd_depth_img[
-                    np.average([y_min, y_max]),
-                    np.average([x_min, x_max])
-                ]
+        except ValueError as e:
+            # nonzero_region was empty
+            rospy.logwarn(e)
+            return RETURN_ERROR
         else:
             # Perform data collection for depth image investigation
             if self.test_mode:
                 self.avg_depth_pub.publish(encode_rosnp(avgd_depth_img.astype(np.uint16)))
                 rospy.loginfo(f"{self.name}:\nDepth img Sent.")
-        finally:
-            if Z_c == 0 or np.isnan(Z_c) or Z_c > MAX_DEPTH:
+                
+            if np.isnan(Z_c) or Z_c > MAX_DEPTH:
                 rospy.logwarn(f'{self.name}: Invalid Z value {Z_c}.')
-                return np.array([])
+                return RETURN_ERROR
             else:
                 Z_c = Z_c / 1000  # convert to meters
                 rospy.loginfo(f'{self.name}: Averaged Z_val (m): {Z_c}')
@@ -671,4 +665,5 @@ if __name__ == '__main__':
         DataProcessor()
     except rospy.ROSInterruptException:
         pass
+
 

@@ -123,6 +123,7 @@ class NodeLiaison:
             # Depth images are 16UC1 in this platform
             # Must use np.ndarray initialization due to the data being
             # interpreted as bytes. Prevents a headache.
+            # print(f"<{self.name}> Depth Encoding: {msg.encoding}\n")
             arr = np.ndarray(shape=shape, dtype=np.uint16, buffer=data)
             self.imgs.append(arr)
         else:
@@ -149,3 +150,4 @@ if __name__ == '__main__':
         NodeLiaison()
     except rospy.ROSInterruptException:
         pass
+
