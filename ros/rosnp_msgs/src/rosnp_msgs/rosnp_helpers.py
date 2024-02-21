@@ -2,6 +2,7 @@
 """
 @author: Terrance Williams
 @date: 23 October 2023
+@last_edited: 19 February 2024
 @description: Revised helper functions for the construction and deconstruction
 of ROSNumpy-type messages.
 """
@@ -58,16 +59,17 @@ def encode_rosnp(array: np.ndarray):
     msg
         The corresponding ROSNumpy message.
     """
+    func_name = "rosnp_helpers.encode_rosnp"
 
     if not isinstance(array, np.ndarray):
-        raise ValueError("<rosnp_helpers.encode_rosnp> Input is not a Numpy array.")
+        raise ValueError(f"<{func_name}> Input is not a Numpy array.")
     
     shape = array.shape
     dtype = array.dtype.name
+    rosnp = array.flatten()
     # correct ROS' uint8[] -> bytes serialization 
     # All other numeric-typed arrays
     # are serialized as tuples.
-    rosnp = array.flatten()
     if dtype == 'uint8':
         rosnp = rosnp.tobytes()
     
@@ -75,8 +77,10 @@ def encode_rosnp(array: np.ndarray):
     try:
         msg = rosnp_dict[dtype]()
     except KeyError:
-        print((f"<rosnp_helpers.encode_rosnp> Input dtype {dtype}"
-              " is not among accepted formats. Use one of the following:"))
+        print(
+            f"<{func_name}> Input dtype {dtype} "
+            "is not among accepted formats. Use one of the following:"
+        )
         for key in rosnp_dict:
             print(key)
         raise
@@ -100,12 +104,14 @@ def encode_rosnp_list(array_list: List[np.ndarray]):
     msg:
         The ROSNumpyList message of requisite data type.
     """
-
+    func_name = "rosnp_helpers.encode_rosnp_list"
     # Would silent failure be better than Exceptions?
     # should I return a msg with a Numpy message of NaN?
     if not array_list:
-        raise ValueError(("<rosnp_helpers.encode_rosnp_list>",
-                          " Cannot make message from empty list."))
+        raise ValueError(
+            f"<{func_name}>"
+            " Cannot make message from empty list."
+        )
     
     # Create list of msgs
     msg_arr = [encode_rosnp(arr) for arr in array_list]
@@ -115,13 +121,12 @@ def encode_rosnp_list(array_list: List[np.ndarray]):
     try:
         # Select the correct message and instantiate it.
         msg = rosnp_list_dict[msg_type]()
-        """# Alternate Method
-        dtype = array_list[0].dtype.name
-        msg = rosnp_list_dict[rosnp_dict[dtype]]()"""
     except KeyError:
-        print(("<rosnp_helpers.encode_rosnp_list>",
-                          f" Message type {msg_type} not among supported types."
-                            "Supported Types:"))
+        print(
+            f"<{func_name}> "
+            f"Message type {msg_type} not among supported types.\n"
+            "Supported Types:"
+        )
         for key in rosnp_list_dict:
             print(key)
         raise
@@ -142,11 +147,15 @@ def decode_rosnp(msg):
     result_array: np.ndarray
         The corresponding array from the decoded message.
     """
+    func_name = "rosnp_helpers.decode_rosnp"
+
     # print(type(msg.rosnp), msg.rosnp)
     msg_types = list(rosnp_dict.values())
     if type(msg) not in msg_types:
-        print((f"<rosnp_helpers.decode_rosnp> Message type {type(msg)} not"
-               "among supported types.\nSupported types:"))
+        print(
+            f"<{func_name}> Message type {type(msg)} not"
+            "among supported types.\nSupported types:"
+        )
         for msg_type in msg_types:
             print(msg_type)
         raise TypeError   
@@ -172,11 +181,14 @@ def decode_rosnp_list(msg):
     result_array: List[np.ndarray]
         The corresponding list of Numpy arrays from the decoded message.
     """
+    func_name = "rosnp_helpers.decode_rosnp_list"
     msg_types = list(rosnp_list_dict.values())
 
     if type(msg) not in msg_types:
-        print((f"<rosnp_helpers.decode_rosnp_list> Message type {type(msg)} not"
-                "among supported types.\nSupported types:"))
+        print(
+            f"<{func_name}> Message type {type(msg)} not"
+            "among supported types.\nSupported types:"
+        )
         for msg_type in msg_types:
             print(msg_type)
         raise TypeError
