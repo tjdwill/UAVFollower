@@ -3,7 +3,7 @@
 """
 @author: Terrance Williams
 @creation_date: 7 November 2023
-@last_edited: 24 January 2024
+@last_edited: 19 February 2024
 @description:
     This program defines the node for the Data Processor that processes
     bounding boxes, calculates centers, performs k-means clustering and more.
@@ -13,10 +13,10 @@
 from typing import Tuple
 import numpy as np
 import rospy
-from rosnp_msgs.msg import ROSNumpyList_Float32, ROSNumpyList_UInt16, ROSNumpy_UInt16
+from rosnp_msgs.msg import ROSNumpyList_Float32, ROSNumpy_UInt16
 from rosnp_msgs.rosnp_helpers import decode_rosnp_list, encode_rosnp
 from std_msgs.msg import Header
-from geometry_msgs.msg import Point, PointStamped, PoseStamped, Quaternion, Pose
+from geometry_msgs.msg import Point, PoseStamped, Quaternion, Pose
 from uav_follower.kmeans import KMeans
 from uav_follower.srv import DepthImgReq, TF2Poll
 from std_srvs.srv import Empty
@@ -39,7 +39,7 @@ class DataProcessor:
         self.name = rospy.get_name()
         self.debug = rospy.get_param('~debug')
         self.test_mode = rospy.get_param('test_mode')
-        self.COUNT_THRESH = int(0.8 * rospy.get_param('detect_thresh'))
+        self.COUNT_THRESH = np.ceil(0.8 * rospy.get_param('detect_thresh')).astype(np.uint16)
         self.DENSITY_THRESH = rospy.get_param('~density_thresh', default=1.5)
         self.MAX_ACCEL = rospy.get_param('~max_accel', default=5)
         self.DEPTH_IMG_COUNT = rospy.get_param('depth_img_count')
