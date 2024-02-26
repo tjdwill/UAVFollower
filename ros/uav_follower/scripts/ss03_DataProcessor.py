@@ -22,7 +22,7 @@ from uav_follower.srv import DepthImgReq, TF2Poll
 from std_srvs.srv import Empty
 
 
-MAX_DEPTH = 3000  # mm Experimentally determined
+MAX_DEPTH = 2000  # mm Experimentally determined
 
 class DataProcessor:
     """
@@ -665,5 +665,4 @@ if __name__ == '__main__':
         DataProcessor()
     except rospy.ROSInterruptException:
         pass
-
 

@@ -11,10 +11,10 @@
 	<arg name="map" default="lv_room" />
 	<arg name="map_file" default="$(find uav_follower)/maps/$(arg map).yaml" />
 	<arg name="test_mode" default="false" />
-    
+	<arg name="rviz" default="false" />
+
     <!-- Begin Camera Machinery -->
 	<include file="$(find jethexa_peripherals)/launch/camera.launch"></include>
-
 	<!-- JetHexa Navigation Nodes -->
 	<group unless="$(arg test_mode)">
 		<include file="$(find jethexa_navigation)/launch/jethexa_load_map.launch">
@@ -26,6 +26,7 @@
 		</include>
 	</group>
 	
+	<include file="$(find jethexa_navigation)/launch/jethexa_navigation_rviz.launch" if="$(arg rviz)"></include>
 	<!-- uav_follower Nodes--> 	
 	<group ns="uav_follower">
 		<rosparam command="load" file="$(find uav_follower)/config/uav_follower_params.yaml" />

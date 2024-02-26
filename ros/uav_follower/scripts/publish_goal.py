@@ -22,7 +22,7 @@ def status_callback(msg):
     if msg.status.status == 3:
         try_again = True
         if not add_more_point: # one point finish
-            print('Goal reached')
+            print('No additional points to add.')
         if goal_index < goal_count:
             pose = PoseStamped()
             pose.header.frame_id = map_frame
@@ -117,7 +117,7 @@ def click_callback(msg):
     
     goal_count += 1
     
-    print('added a goal point')
+    print('Added a goal point\n')
 
 if __name__ == '__main__':
     rospy.init_node('publish_point_node')

@@ -128,6 +128,7 @@ class UAVDetector:
         for detection in xyxyn:
             conf = detection[4].round(2)  # Why doesn't this round correctly?
             if conf >= self.CONF:
+                conf_str = f'{conf:.3f}'
                 detected = True   
                 x1 = (detection[0] * self.IMG_WIDTH).astype(np.uint16)
                 y1 = (detection[1] * self.IMG_HEIGHT).astype(np.uint16)
@@ -139,12 +140,12 @@ class UAVDetector:
                 
                 if x2 > (5 * self.IMG_WIDTH) // 6:
                     cv2.putText(
-                        frame, f'{conf}',(x1, y1 - 10),
+                            frame, conf_str, (x1, y1 - 10),
                         font, font_scale, font_color, thickness=font_thickness
                     )
                 else:
                     cv2.putText(
-                        frame, f'{conf}', (x2, y1 - 10),
+                        frame, conf_str, (x2, y1 - 10),
                         font, font_scale, font_color, thickness=font_thickness
                     )
         else:
