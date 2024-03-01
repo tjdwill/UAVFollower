@@ -38,34 +38,13 @@ class KMeans:
             * data = data.reshape(-1, 3)
         and pass this data into the constructor.
 
-        Features
+        Feature(s)
         --------
         - Clustering (of course!):
             Cluster data into a specified number of
             clusters using user-defined thresholding and
             iteration limit. All three parameters are adjustable via
             attribute assignment.
-
-        - Segmenting Images:
-            Once you've clustered an image's colorspace
-            (if you're also using the Image class, there is a method
-            for this), pass in an RGB-ordered version of
-            the image (again, Image class can provide this, or just flip
-            the array about its color columns 'img_array[..., ::-1]'),
-            pass in the RGB image, the clusters, and the centroids.
-            The method can segment images using random colors or use the
-            centroids as the cluster colors.
-
-            *NOTE*:
-            Because the method has to iterate through every pixel of
-            every cluster, it can take a lot of time to run
-            (~0.056 s / pixel). At the time of writing, the author is
-            unaware of alternative methods.
-
-        - (BONUS) Re-opening the figure(s):
-            Accidentally closing a Matplotlib figure and not being able to
-            open it again can be bothersome, so there is a method that can
-            "re-open" a figure.
     """
 
     # =================
