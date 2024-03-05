@@ -11,6 +11,7 @@
 import csv
 import time
 from pathlib import Path
+from datetime import datetime
 
 from tjdrone import TDrone
 
@@ -20,8 +21,7 @@ dir_name = "positions"
 pos_dir = Path(dir_name)
 if not pos_dir.exists():
     pos_dir.mkdir()
-exp_num = len(tuple(pos_dir.iterdir()))
-posfile = pos_dir / f"drone_pos_{exp_num:02d}.csv"
+posfile = pos_dir / f"uav_pos_{datetime.now():%Y-%m-%d_%H-%M-%S}.csv"
 
 # Drone interfacing
 BATTERY_LIM = 40
