@@ -2,7 +2,7 @@ test_mode: False
 detect_thresh: 7
 depth_img_count: 10
 fps: 24  # ss01 Pub Rate
-follow_distance: 0.2 # meters
+follow_distance: 0.3 # meters
 
 topics:
     img_topic: "RGBHub"
