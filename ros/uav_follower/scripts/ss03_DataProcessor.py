@@ -15,14 +15,14 @@ import numpy as np
 import rospy
 from rosnp_msgs.msg import ROSNumpyList_Float32, ROSNumpy_UInt16
 from rosnp_msgs.rosnp_helpers import decode_rosnp_list, encode_rosnp
-from std_msgs.msg import Header
-from geometry_msgs.msg import Point, PoseStamped, Quaternion, Pose
+from std_msgs.msg import Header, Float32
+from geometry_msgs.msg import Point, PointStamped, PoseStamped, Quaternion, Pose
 from uav_follower.kmeans import KMeans
 from uav_follower.srv import DepthImgReq, TF2Poll
 from std_srvs.srv import Empty
 
 
-MAX_DEPTH = 2000  # mm Experimentally determined
+MAX_DEPTH = 1000  # mm Experimentally determined
 
 class DataProcessor:
     """
@@ -43,6 +43,8 @@ class DataProcessor:
         self.DENSITY_THRESH = rospy.get_param('~density_thresh', default=1.5)
         self.MAX_ACCEL = rospy.get_param('~max_accel', default=5)
         self.DEPTH_IMG_COUNT = rospy.get_param('depth_img_count')
+        self.FOLLOW_DIST = rospy.get_param("follow_distance")
+
         topics = rospy.get_param('topics')
         waypoints_topic = rospy.get_param('~waypoints')  # launch file
         self.frame_id = rospy.get_param('~frame_id')  # launch file
@@ -65,6 +67,17 @@ class DataProcessor:
             PoseStamped,
             queue_size=1
         )
+        ## New Publishers (4 March 2024)
+        self.depth_pub = rospy.Publisher(
+            topics['depth_val'],
+            Float32,
+            queue_size=2
+        )
+        self.drone_pos_pub = rospy.Publisher(
+            topics['calcd_drone_pos'],
+            PointStamped,
+            queue_size=2
+        )
         ## Services 
         rospy.wait_for_service(topics['depth_req'])
         self.depth_req = rospy.ServiceProxy(
@@ -76,8 +89,8 @@ class DataProcessor:
             Empty
         )
         if self.test_mode:
-            self.avg_depth_pub = rospy.Publisher(
-                topics['avg_depth'],
+            self.avgd_depthimg_pub = rospy.Publisher(
+                topics['avgd_depth_img'],
                 ROSNumpy_UInt16,
                 queue_size=1
             )
@@ -406,7 +419,7 @@ class DataProcessor:
         )
 
         print(
-            f"Displacement transform:\nTranslation:\t{body_frame_translation}"
+            f"Displacement transform (from img frame):\nTranslation:\t{body_frame_translation}"
             f"\nQuaternion:\t{q1}"
         )
         # =====================
@@ -415,7 +428,7 @@ class DataProcessor:
         
         if self.test_mode:
             from geometry_msgs.msg import Vector3
-            transln = Vector3(0., 0., 0.)
+            curr_pos = Vector3(0., 0., 0.)
             q0 = Quaternion(0., 0., 0., 1.)
         else:
             # Request tf2 Data (TF2PollResponse msg)
@@ -424,44 +437,60 @@ class DataProcessor:
                 rospy.logwarn(f'{self.name}: Could not get transform.')
                 return None
             else:
-                transln = tf2_resp.transform.translation
+                curr_pos = tf2_resp.transform.translation
                 q0 = tf2_resp.transform.rotation
                 rospy.loginfo(
                     f'{self.name} Received Transform (map->base_link):\n'
-                    f'{transln}\n{q0}\n'
+                    f'{curr_pos}\n{q0}\n'
                 )
         # Apply the rotations in reverse (disp, then robot's current orientation)
-        q = self._quat_product(q0, q1)
-        R = self._get_quaternion_matrix(q)
-        print("QUATERNION MATRIX:\n", R)
 
+        R_UAV = np.linalg.inv(self._get_quaternion_matrix(q1))
+        R_map = np.linalg.inv(self._get_quaternion_matrix(q0))
+
+        R_map = self._get_quaternion_matrix(q0)
+        """
+        Imagine the hexapod rotates to align its body with the UAV. What is the
+        UAV position in the new body frame?
+        """
+        aligned_pos = R_UAV @ body_frame_translation
+        print(f"\n<{self.name}.goalpoint_func> Aligned Position:\n{aligned_pos}")  # y should always be near 0
+    
         # Convert to map coordinates
-        displacement = R @ body_frame_translation
-        print(f"Calculated Displacement: {displacement}")
+        goal_pos_bf = np.copy(aligned_pos)
+        goal_pos_bf[0] -= self.FOLLOW_DIST
+        goal_pos_map_aligned = R_map @ goal_pos_bf # align with map frame
+        print(f"\nCalculated Translation: {goal_pos_map_aligned}")
+        goalpoint_msg = Point()
+        goalpoint_msg.x =  goal_pos_map_aligned[0] + curr_pos.x
+        goalpoint_msg.y =  goal_pos_map_aligned[1] + curr_pos.y
+        goalpoint_msg.z =  goal_pos_map_aligned[2] + curr_pos.z
 
-        point_msg = Point()
-        point_msg.x = transln.x + displacement[0]
-        point_msg.y = transln.y + displacement[1]
-        point_msg.z = transln.z + displacement[2]
-        
+        # Orientation
+        q = self._quat_product(q0, q1)
         quat = Quaternion(*q)
-        pose_msg = Pose(position=point_msg, orientation=quat)
+        # quat = Quaternion(0., 0., 0., 1.)
+        pose_msg = Pose(position=goalpoint_msg, orientation=quat)
         rospy.loginfo(f'{self.name}: Pose msg:\n{pose_msg}')
-        if self.debug:
-            current_pos = np.array([transln.x, transln.y, transln.z])
-            target_pt = displacement + current_pos
-            print(f'UAV Detected: {target_pt}')
             
         header = Header(
             frame_id=self.frame_id,
             stamp=rospy.Time.now()
         )
 
+        # Publish Drone data
+        drone_pos = R_map @ np.copy(aligned_pos)
+        drone_msg = Point()
+        drone_msg.x = drone_pos[0] + curr_pos.x  
+        drone_msg.y = drone_pos[1] + curr_pos.y  
+        drone_msg.z = drone_pos[2] + curr_pos.z 
+
+        self.drone_pos_pub.publish(PointStamped(header=header, point=drone_msg))
+
         return PoseStamped(
             header=header,
             pose=pose_msg
         ) 
-    
     
     def _get_depth_val(self, bbox: np.ndarray) -> np.ndarray:
         """
@@ -483,7 +512,7 @@ class DataProcessor:
         depth_imgs = decode_rosnp_list(depth_imgs_msg.depth_imgs)
         assert num_imgs == len(depth_imgs)
         ## Convert type for math operations; prevent data overflow (ex. 65535 + 1 -> 0)
-        depth_imgs = [arr.astype(np.float64) for arr in depth_imgs]
+        depth_imgs = [arr.astype(np.float32) for arr in depth_imgs]
 
         # Average the depth images
         avgd_depth_img = depth_imgs[0]
@@ -511,7 +540,7 @@ class DataProcessor:
         else:
             # Perform data collection for depth image investigation
             if self.test_mode:
-                self.avg_depth_pub.publish(encode_rosnp(avgd_depth_img.astype(np.uint16)))
+                self.avgd_depthimg_pub.publish(encode_rosnp(avgd_depth_img.astype(np.uint16)))
                 rospy.loginfo(f"{self.name}:\nDepth img Sent.")
                 
             if np.isnan(Z_c) or Z_c > MAX_DEPTH:
@@ -520,6 +549,7 @@ class DataProcessor:
             else:
                 Z_c = Z_c / 1000  # convert to meters
                 rospy.loginfo(f'{self.name}: Averaged Z_val (m): {Z_c}')
+                self.depth_pub.publish(Float32(Z_c))
                 return Z_c
     
     def _get_transform(self, img_coords: np.ndarray) -> tuple:
@@ -527,13 +557,13 @@ class DataProcessor:
             Returns the calculated transform to the detected UAV
         
             Returns:
-                displacement: np.ndarray
+                drone_in_bf: np.ndarray
                     Usual [x,y,z] format
                 rotation: np.ndarray 
                     A quaternion
         """
         x_px, y_px, Z_c = img_coords
-        displacement = np.array([0, 0, 0])
+        drone_in_bf = np.array([0, 0, 0])
         rotation = np.array([0, 0, 0, 1])
 
         # Calculate body-frame vector
@@ -547,13 +577,10 @@ class DataProcessor:
         The formula is body_frame = [x, y, z]^T 
         = (Z_c / f_px)*[f_px, -x_px, -y_px]^T
         """
-        follow_dist = rospy.get_param("follow_distance")
         # Intrinsic Camera Parameters for back projection
         cx, cy = self.cx, self.cy
         f_px = self.f_px
-        body_frame = (Z_c / f_px) * np.array([f_px, cx-x_px, cy-y_px])
-        displacement = np.copy(body_frame)
-        displacement[0] -= follow_dist
+        drone_in_bf = (Z_c / f_px) * np.array([f_px, cx-x_px, cy-y_px])
 
         # Quaternion calculation
         """
@@ -573,7 +600,7 @@ class DataProcessor:
             From there, I calculate the quaternion knowing the rotation is
             about the z-axis.
         """
-        disp_xproj = np.copy(body_frame)
+        disp_xproj = np.copy(drone_in_bf)
         disp_xproj[-1] = 0.
 
         v_x, v_y, _ = disp_xproj
@@ -582,7 +609,7 @@ class DataProcessor:
         theta = np.arccos(v_x/np.linalg.norm(disp_xproj)) 
         if v_y < 0:
             theta *= -1
-        print(f"Calculated theta: {np.degrees(theta)}") 
+        print(f"<{self.name}._get_tranform> Calculated theta: {np.degrees(theta)}") 
         # Convert quaternion message to ndarray; Doing it this way ensures the
         # array is ordered correctly.
         rotation = Quaternion()
@@ -591,7 +618,7 @@ class DataProcessor:
         rotation.z = np.sin(theta/2)
         rotation.w = np.cos(theta/2)
 
-        return displacement, self._np_quat(rotation)
+        return drone_in_bf, self._np_quat(rotation)
     
     def _get_quaternion(self, angle: float, direction_vector: np.ndarray) -> np.ndarray:
         """Assumes angle input is in radians"""

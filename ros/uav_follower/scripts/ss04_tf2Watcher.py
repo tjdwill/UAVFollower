@@ -14,7 +14,7 @@ from __future__ import print_function
 
 import rospy
 import tf2_ros
-from geometry_msgs.msg import Transform
+from geometry_msgs.msg import Transform, TransformStamped
 from uav_follower.srv import TF2Poll, TF2PollResponse
 
 """
@@ -37,6 +37,11 @@ class tf2Watcher:
                 topics['tf2'],
                 TF2Poll,
                 self.response
+        )
+        self.tf2_pub = rospy.Publisher(
+            topics["tf2_record"],
+            TransformStamped,
+            queue_size=1
         )
         rospy.loginfo('{}: Online.'.format(self.name))
         rospy.spin()
@@ -64,6 +69,7 @@ class tf2Watcher:
             # print("<{}>: current_transf".format(self.name))
             resp.successful = True
             resp.transform = current_transf.transform
+            self.tf2_pub.publish(current_transf)
         return resp
 
 

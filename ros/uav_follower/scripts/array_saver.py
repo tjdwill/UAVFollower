@@ -75,7 +75,7 @@ class ArraySaver:
             )
 
             self.avg_depth_sub = rospy.Subscriber(
-                topics['avg_depth'],
+                topics['avgd_depth_img'],
                 ROSNumpy_UInt16,
                 self.get_avg_depth,
                 queue_size = SUB_QUEUE_SZ,

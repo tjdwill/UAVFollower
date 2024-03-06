@@ -11,6 +11,7 @@
 	<arg name="map" default="lv_room" />
 	<arg name="map_file" default="$(find uav_follower)/maps/$(arg map).yaml" />
 	<arg name="test_mode" default="false" />
+	<arg name="record_data" default="false" />
 	<arg name="rviz" default="false" />
 
     <!-- Begin Camera Machinery -->
@@ -54,6 +55,8 @@
 		<node name="array_saver" pkg="uav_follower" type="array_saver.py" output="screen" respawn="true" if="$(arg test_mode)">
 			<param name="log_dir" type="string" value="$(find uav_follower)/logs" />
 		</node>
+
+		<node name="data_recorder" pkg="uav_follower" type="rosbag_script.zsh" if="$(arg record_data)"></node>
 	</group>
 </launch>
 

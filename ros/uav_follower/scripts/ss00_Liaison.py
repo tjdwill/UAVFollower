@@ -49,10 +49,10 @@ class NodeLiaison:
         if self.test_mode:
             # For tests in which we don't want to run the full navigation
             # but still want continuous detections.
-            from geometry_msgs.msg import PointStamped
+            from geometry_msgs.msg import PoseStamped
             self.test_sub = rospy.Subscriber(
                 rospy.get_param("~waypoints"),
-                PointStamped,
+                PoseStamped,
                 self.test_version_resume
             )
         else:
