@@ -7,6 +7,7 @@ This is a temporary script file.
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import scienceplots
 import pandas as pd
 import numpy as np
 from os import chdir
@@ -15,6 +16,8 @@ from pathlib import Path
 
 # Initial Config
 mpl.rcParams['figure.dpi'] = 300  # Hi-res figures
+plt.style.use(['science', 'ieee'])
+plt.rc('legend', fontsize=6)
 
 # Pathing: Load files
 chdir(Path("C:/Users/Tj/Documents/GradSchool/Thesis/Programming/ros/20240306_2009_uav_follower_analysis/bags/following_experiments"))
