@@ -17,11 +17,11 @@ from pathlib import Path
 mpl.rcParams['figure.dpi'] = 300  # Hi-res figures
 
 # Pathing: Load files
-chdir(Path("C:/Users/tjdwill/Desktop"))
+chdir(Path("C:/Users/Tj/Documents/GradSchool/Thesis/Programming/ros/20240306_2009_uav_follower_analysis/bags/following_experiments"))
 
-file_exp02 =  Path("uav_follow_exp_2024-03-05-18-45-24_combined.csv")
-file_exp03 = Path("uav_follow_exp_2024-03-05-19-00-55_comparison.csv")
-exp_file = file_exp02
+file_exp02 =  Path("exp02/csv/uav_follow_exp_2024-03-05-18-45-24_combined.csv")
+file_exp03 = Path("exp03/csv/uav_follow_exp_2024-03-05-19-00-55_combined.csv")
+exp_file = file_exp03
 
 # Read the data into the variables
 csv = pd.read_csv(exp_file)
@@ -63,7 +63,8 @@ depth_measured = np.copy(depth)
 error_depth = depth_measured - depth_real
 
 # Averages
-avg_error_est_x = np.average(np.array([*error_est_x[0:3], error_est_x[-1]])) # Remove outlier
+# avg_error_est_x = np.average(np.array([*error_est_x[0:3], error_est_x[-1]])) # Remove outlier
+avg_error_est_x = np.average(error_est_x) # Remove outlier
 avg_error_est_y = np.average(error_est_y)
 avg_error_depth = np.average(error_depth)
 
@@ -94,21 +95,21 @@ fig, ax = plt.subplots()
 
 ax.set(title="Map Frame X Positions", xlabel="Time (s)", ylabel="X (m)")
 ax.grid()
-ax.plot(t, drone_x, '-o', color='k', label="Drone Ground Truth")
-ax.plot(t, est_x, '-o', color='r', label="Estimated Drone Position")
-ax.plot(t, hexa_x, '-o', color='b', label="Hexapod")
-ax.plot(future_hexa_t, future_hexa_x, '-o', color='g', label="Hexapod (Time Shifted)")
+ax.plot(t, drone_x, '-o', color='k', label="CoDrone Ground Truth")
+ax.plot(t, est_x, '-o', color='r', label="Estimated CoDrone Position")
+ax.plot(t, hexa_x, '-o', color='b', label="JetHexa")
+ax.plot(future_hexa_t, future_hexa_x, '-o', color='g', label="JetHexa (Time Shifted)")
 plt.legend()
 
 
 y_fig, y_ax = plt.subplots()
 
-y_ax.set(title="Map Frame Y Positions", xlabel="time (s)", ylabel="Y (m)")
+y_ax.set(title="Map Frame Y Positions", xlabel="Time (s)", ylabel="Y (m)")
 y_ax.grid()
-y_ax.plot(t, drone_y, '-o', color='k', label="Drone Ground Truth")
-y_ax.plot(t, est_y, '-o', color='r', label="Estimated Drone Position")
-y_ax.plot(t, hexa_y, '-o', color='b', label="Hexapod")
-y_ax.plot(future_hexa_t, future_hexa_y, '-o', color='g', label="Hexapod (Time Shifted)")
+y_ax.plot(t, drone_y, '-o', color='k', label="CoDrone Ground Truth")
+y_ax.plot(t, est_y, '-o', color='r', label="Estimated CoDrone Position")
+y_ax.plot(t, hexa_y, '-o', color='b', label="JetHexa")
+y_ax.plot(future_hexa_t, future_hexa_y, '-o', color='g', label="JetHexa (Time Shifted)")
 plt.legend()
 plt.show()
 
