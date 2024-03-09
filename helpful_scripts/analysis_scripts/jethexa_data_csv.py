@@ -2,7 +2,9 @@
 #-*-coding: utf8-*-
 
 """
-Writing a script to extract message data to a more manipulable form.
+Writing a script to extract message data to a more manipulable form. Once you've generated the ROS Bag from recording the
+topic that listens to the /jethexa/map <-> /jethexa/base_link transform, use this script to save the data to a CSV. 
+This is done for ease of plotting in Matplotlib.
 """
 
 import csv
