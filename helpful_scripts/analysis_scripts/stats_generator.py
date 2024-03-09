@@ -285,7 +285,7 @@ while np.max(time_errors) > TIME_ERR_THRESH and count < ATTEMPT_OUT:
     count += 1
     #print(np.max(time_errors))
 else:
-    if count >= ATTEMPT_OIT:
+    if count >= ATTEMPT_OUT:
         raise ValueError(f"Could not get a sample with less than {TIME_FOR_THRESH} time error.\n")
 
 print(f"Found a good sample on the {count}th try.\n")
