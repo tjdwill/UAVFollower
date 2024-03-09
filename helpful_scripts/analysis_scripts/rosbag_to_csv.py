@@ -1,4 +1,5 @@
-#! /usr/bin/env python3 -*-coding: utf8-*-
+#! /usr/bin/env python3 
+# -*-coding: utf8-*-
 
 """
 Writing a script to extract message data to a more manipulable form.
@@ -54,7 +55,7 @@ if __name__ == "__main__":
     with open(amcl_csv, 'w', newline="") as csv_file:
         csv_scribe = csv.writer(csv_file)
         csv_scribe.writerow(
-            ["Time (ns)", "X (m)", "Y (m)", "Z (m)", "x", "y", "z", "w", "X_covar(m)"]
+            ["Time", "X (m)", "Y (m)", "Z (m)", "x", "y", "z", "w", "X_covar(m)"]
         )
         for topic, msg, t in bag.read_messages(topics=["/jethexa/amcl_pose"]):
             X = msg.pose.pose.position.x
@@ -73,7 +74,7 @@ if __name__ == "__main__":
     with open(goalpt_csv, 'w', newline="") as csv_file:
         csv_scribe = csv.writer(csv_file)
         csv_scribe.writerow(
-            ["Time (ns)", "X (m)", "Y (m)" , "Z (m)", "x", "y", "z", "w"]
+            ["Time", "X (m)", "Y (m)" , "Z (m)", "x", "y", "z", "w"]
         )
         for topic, msg, t in bag.read_messages(
             topics=["/jethexa/move_base_simple/goal"]
@@ -91,7 +92,7 @@ if __name__ == "__main__":
     # std_msgs/Float32
     with open(depth_csv, 'w', newline="") as csv_file:
         csv_scribe = csv.writer(csv_file)
-        csv_scribe.writerow(["Time (ns)", "Depth (m)"])
+        csv_scribe.writerow(["Time", "Depth (m)"])
         for topic, msg, t in bag.read_messages(
             topics=["/uav_follower/calcd_depth_val"]
         ):
@@ -102,7 +103,7 @@ if __name__ == "__main__":
     # geometry_msgs/PointStamped
     with open(drone_est_csv, 'w', newline="") as csv_file:
         csv_scribe = csv.writer(csv_file)
-        csv_scribe.writerow(["Time (ns)", "X (m)", "Y (m)", "Z (m)"])
+        csv_scribe.writerow(["Time", "X (m)", "Y (m)", "Z (m)"])
         for topic, msg, t, in bag.read_messages(
             topics=["/uav_follower/calcd_drone_pos"]
         ):
@@ -118,7 +119,7 @@ if __name__ == "__main__":
         with open(tf2_csv, 'w', newline="") as csv_file:
             csv_scribe = csv.writer(csv_file)
             csv_scribe.writerow(
-                ["Time (ns)", "X (m)", "Y (m)" , "Z (m)", "x", "y", "z", "w"]
+                ["Time", "X (m)", "Y (m)" , "Z (m)", "x", "y", "z", "w"]
             )
             for topic, msg, t in bag.read_messages(
                 topics=["/uav_follower/tf2_record"]
