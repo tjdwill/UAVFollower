@@ -3,14 +3,18 @@
 
 """
 @author: Terrance Williams
-@title: ss04_tf2Watcher
-@date: 6 December 2023
+@title: tf2_pub
+@date: 7 March 2024
 @description:
-    A node to send request transforms between relevant frames.
-    Using Python 2.7 because ROS Melodic's tf2_ros package is not
-    compiled for Python3. 
+    This is a node I wrote to enable getting a specific tf tranform. I couldn't figure out
+    how to use the correct `rosbag filter` command that only selects for a specific tf transform, so 
+    I run this node while replaying a bag file with the entire tf playback. 
+
+    Play a rosbag while using a simulated clock and then run this node with the desired transform link.
+    Then, save the results of this topic to another bag for later extraction. 
+    Probably "inelegant" as a solution, but it worked.
 """
-from __future__ import print_function
+# from __future__ import print_function
 
 import rospy
 import tf2_ros
@@ -54,11 +58,8 @@ class tf2Watcher:
                 tf2_ros.ExtrapolationException
             ) as e:
                 print("No frames.\n", e)
-                # what are messages initialized as?            
             else:
-                # print("<{}>: current_transf".format(self.name)
                 self.tf2_pub.publish(current_transf)
-
 
 
 if __name__ == "__main__":
@@ -66,4 +67,3 @@ if __name__ == "__main__":
         tf2Watcher()
     except rospy.ROSInterruptException:
         pass
-
