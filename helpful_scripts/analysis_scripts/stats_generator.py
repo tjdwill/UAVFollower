@@ -2,7 +2,10 @@
 """
 Spyder Editor
 
-This is a temporary script file.
+This file generates the position and error plots, the following distance plot, and relevant statistics.
+The data should be formatted via CSV and should already be time-synchronized as much as possible.
+This is more exploratory programming in nature, so it helps to use Spyder to view the variable values
+and interact/experiment with the data via the iPython command line.
 """
 
 import matplotlib as mpl
@@ -120,7 +123,7 @@ median_follow_err_x = np.median(np.abs(FOLLOW_DIST - follow_dist_real_x)).round(
 median_follow_err = np.median(np.abs(FOLLOW_DIST - follow_dist_real)).round(decimal_place)
 
 
-#%% Write Results to Fiile
+#%% Write Results to File
 in_separator = "_"
 out_separator = "_"
 name_parts = combined_exp_file.name.split(in_separator)[0:-1]  # strip last element with extension
@@ -235,7 +238,8 @@ ax.bar(
 # %% Follow Distance Plot
 
 """
-The CoDrone and JetHexa data are not aligned in terms of the number of elements, meaning the distance cannot be calculated for every point in both sets of data. Therefore, I need to sample the larger set of data for points within the time range of the smaller set.
+The CoDrone and JetHexa data are not aligned in terms of the number of elements, meaning the distance cannot be calculated for every point in both sets of data.
+Therefore, I need to sample the larger set of data for points within the time range of the smaller set.
 
 The codrone has more data.
 """
@@ -243,7 +247,8 @@ The codrone has more data.
 num_samples = jethexa_t.shape[0]
 
 """
-Via the Variable Explorer in Spyder, I can see that the first time element in CoDrone data that corresponds to the JetHexa data is at element 140. The JetHexa Data is further apart in time (avg. of about .4 seconds). The CoDrone data is about .15 seconds apart, so I take every three points.
+Via the Variable Explorer in Spyder, I can see that the first time element in CoDrone data that corresponds to the JetHexa data is at element 140.
+The JetHexa Data is further apart in time (avg. of about .4 seconds). The CoDrone data is about .15 seconds apart, so I take every three points.
 """
 codrone_cat_orig = np.concatenate((codrone_t.reshape(-1, 1), codrone_x.reshape(-1, 1), codrone_y.reshape(-1, 1)), axis=1)
 
@@ -251,7 +256,8 @@ codrone_cat = codrone_cat_orig[140::3]
 
 
 """
-From here, the codrone data has 340 points to Jethexa's 372, and they are much closer in time spans. Now, I sample JetHexa's data in order to get 340 points.
+From here, the codrone data has 340 points to Jethexa's 372 for this data iteration, and they are much closer in time spans.
+Now, I sample JetHexa's data in order to get 340 points. Naturally, this will change for different runs.
 """
 jethexa_cat = np.concatenate((jethexa_t.reshape(-1, 1), jethexa_x.reshape(-1, 1), jethexa_y.reshape(-1, 1)), axis=1)
 
@@ -265,7 +271,7 @@ jethexa_sampled = rng.choice(
 jethexa_sampled = np.sort(jethexa_sampled, axis=0)
 time_errors = np.abs(jethexa_sampled[:,0] - codrone_cat[:,0])
 
-## Sample until we get a good batch
+## Sample until we get a good batch; Don't want significant time error (use a powerful computer).
 TIME_ERR_THRESH = 1
 ATTEMPT_OUT = 10000000
 count = 0
@@ -278,8 +284,11 @@ while np.max(time_errors) > TIME_ERR_THRESH and count < ATTEMPT_OUT:
     time_errors = np.abs(jethexa_sampled[:,0] - codrone_cat[:,0])
     count += 1
     #print(np.max(time_errors))
+else:
+    if count >= ATTEMPT_OIT:
+        raise ValueError(f"Could not get a sample with less than {TIME_FOR_THRESH} time error.\n")
 
-print(count)
+print(f"Found a good sample on the {count}th try.\n")
 median_time_error = np.median(time_errors)
 mean_time_error = np.mean(time_errors)
 distances = jethexa_sampled[:,1:] - codrone_cat[:,1:]
@@ -287,7 +296,8 @@ distances = distances ** 2
 follow_dist = np.sum(distances, axis=1)
 median_follow_dist = np.median(follow_dist)
 mean_follow_dist = np.mean(follow_dist)
-# %%% Plot it
+
+# %%% Plot the follow distances
 fig, ax = plt.subplots()
 ax.set(
     title="Follow Distance",
