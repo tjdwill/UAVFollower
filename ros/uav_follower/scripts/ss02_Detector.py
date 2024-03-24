@@ -243,8 +243,9 @@ class UAVDetector:
             ...
             """
         else:
-            print(f"Tensor:{tensor}\nDepth_vals:{depth_vals}\n")
-            print(f"TensorShape:{tensor.shape}\nDepth_vals:{depth_vals.shape}\n")
+            if self.test_mode:
+                print(f"Tensor:{tensor}\nDepth_vals:{depth_vals}\n")
+                print(f"TensorShape:{tensor.shape}\nDepth_vals:{depth_vals.shape}\n")
             if self.collecting:
                 # Tensor entry: [xmin, ymin, xmax, ymax, confidence, class, depth_val]
                 tensor = np.concatenate((tensor, depth_vals[..., np.newaxis]), axis=1)

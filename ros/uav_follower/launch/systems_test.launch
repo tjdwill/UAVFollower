@@ -1,0 +1,26 @@
+<?xml version="1.0" ?>
+
+<launch>
+	<!-- JetHexa Compatibility -->
+	<arg name="master_name" default="$(env MASTER_NAME)"/>
+	<arg name="robot_name" default="$(env ROBOT_NAME)" />
+	<arg name="tf_prefix" default="$(arg robot_name)" />
+	<arg name="test_mode" default="true" />
+	
+
+    <!-- Begin Camera Machinery -->
+	<include file="$(find jethexa_peripherals)/launch/camera.launch"></include>
+	
+	<!-- uav_follower Nodes--> 	
+	<group ns="uav_follower">
+		<rosparam command="load" file="$(find uav_follower)/config/uav_follower_params.yaml" />
+		<param name="test_mode" type="bool" value="$(arg test_mode)" />	
+		<node name="ss00_Liaison" pkg="uav_follower" type="ss00_Liaison.py" output="screen" required="true"></node>
+
+		<node name="ss01_Photographer" pkg="uav_follower" type="ss01_Photographer.py" output="screen" respawn="true"></node>
+        
+		<node name="ss02_Detector" pkg="uav_follower" type="ss02_Detector.py" output="screen" required="true"></node>
+
+		<node name="ss03_DataProcessor" pkg="uav_follower" type="ss03_DataProcessor.py" output="screen" required="true"></node>
+	</group>
+</launch>

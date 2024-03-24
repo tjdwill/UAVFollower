@@ -6,7 +6,7 @@ follow_distance: 0.3 # meters
 yolo: {
         "yolo": "/home/hiwonder/yolov5",
         "weights": "/home/hiwonder/yolov5/weights/20231101_drone_weights.pt",
-        "conf": 0.50
+        "conf": 0.35
     }
 topics:
     img_topic: "RGBHub"
@@ -29,6 +29,7 @@ frame_data:
 ss00_Liaison:
     depth_topic: "/camera/depth/image_raw"
     waypoints: "waypoints"
+    move_base_result: "simulate_move_base_result"
 
 ss02_Detector:
 # Define the private parameters for ss02.

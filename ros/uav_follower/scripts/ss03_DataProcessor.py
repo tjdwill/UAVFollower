@@ -10,7 +10,7 @@
     bounding boxes, calculates centers, performs k-means clustering and more.
 """
 
-from typing import Tuple
+from typing import Tuple, List
 import numpy as np
 import rospy
 from rosnp_msgs.msg import ROSNumpyList, ROSNumpy
@@ -22,7 +22,7 @@ from uav_follower.srv import TF2Poll
 from std_srvs.srv import Empty
 
 
-MAX_DEPTH = 1000  # mm (Depends on operating environment)
+MAX_DEPTH = 1000  # mm (Depends on operating environment); Replaced via params file
 class DataProcessor:
     """
     Performs multiple tasks to process the detections and ultimately produce
@@ -102,14 +102,14 @@ class DataProcessor:
 
     def process_detections(
             self,
-            detection_container: list[np.ndarray],
+            detection_container: List[np.ndarray],
     ) -> Tuple[dict]:
         """
         Sanitizes data to be compatible for KMeans Clustering.
 
         Parameters
         ----------
-        detection_container: list[np.ndarray]
+        detection_container: List[np.ndarray]
             A list containing all appended boundary box xyxyn (normalized xyxy)
             values from Machine Learning inferences. Each array is in format
             [xmin, ymin, xmax, ymax, confidence_interval, label_id, depth_val]
