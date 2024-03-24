@@ -102,22 +102,17 @@ class DataProcessor:
 
     def process_detections(
             self,
-            detection_container: ROSNumpyList,
-            ndim:int=7
+            detection_container: list[np.ndarray],
     ) -> Tuple[dict]:
         """
         Sanitizes data to be compatible for KMeans Clustering.
 
         Parameters
         ----------
-        detection_container: list
+        detection_container: list[np.ndarray]
             A list containing all appended boundary box xyxyn (normalized xyxy)
             values from Machine Learning inferences. Each array is in format
             [xmin, ymin, xmax, ymax, confidence_interval, label_id, depth_val]
-                    
-        ndim: int (optional)
-            number of elements in each given array. Defaults to num of entries
-            in a given detection.
 
         Returns
         -------
@@ -158,13 +153,18 @@ class DataProcessor:
                 Its keys should be strings that semantically convey the
                 information stored within.
         """
+        if not detection_container:
+            raise ValueError("No data to process.\n")
+        
+        # Squeeze the arrays down to at least one dimension and at most two.
+        # Ex. given a list of RGB images, this value would be 3 (height, width, 3 color channels).
+        ndim = detection_container[0].shape[-1]  
         detections = [
             arr.reshape(-1, ndim)
-            for arr in decode_rosnp_list(detection_container)
+            for arr in detection_container
         ]
         
-        # detections = [arr for arr in detections]
-        
+        # The entry with the most detections has the initial means and `k`
         flattened, k_val, means = [], 0, None
         for arr in detections:
             num_rows = arr.shape[0]
@@ -181,8 +181,6 @@ class DataProcessor:
             'k': k_val,
             'means': means
         }
-        # print(f'\n<process_detections>: flattened arrays: {flattened}')
-        # print(f'\n<process_detections>: Means: \n{means}\n')
         other_data = {}
         return kmeans_params, other_data
     
@@ -650,7 +648,7 @@ class DataProcessor:
         waypoint: PoseStamped
 
 
-        kmeans_data, _ = self.process_detections(detections_msg)
+        kmeans_data, _ = self.process_detections(decode_rosnp_list(detections_msg))
         clusters, centroids, extra_data = self.cluster_data(kmeans_data)
         uav_candidates = self.filter_clusters(
             clusters=clusters,
