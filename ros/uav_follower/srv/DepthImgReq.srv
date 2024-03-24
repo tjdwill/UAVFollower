@@ -1,3 +1,0 @@
-uint8 amount
----
-rosnp_msgs/ROSNumpyList_UInt16 depth_imgs
