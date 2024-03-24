@@ -4,7 +4,7 @@
 @author: Terrance Williams
 @original_creation: June 2023
 @version: 1.2.1
-@revision_date: 22 March 2024
+@revision_date: 23 March 2024
 @description: A class for k-means clustering
 """
 # from __future__ import annotations
@@ -26,8 +26,9 @@ class KMeans:
         Data must be in a 2D array. Meaning, if you have some data
         such as data = np.array([0, 1, 2, 3, 4]), do the following:
 
-        * data.shape = (1, data.shape[0])
-        It should make each point a column entry:
+        `data = data.reshape(data.shape[-1], -1)`
+        or `data = data[..., np.newaxis]`
+        It should make each point a row entry:
             [[0], [1], [2], [3], [4]]
         Pass this version into the KMeans constructor.
 
@@ -35,7 +36,7 @@ class KMeans:
         should be flattened using the number of indices
         for the deepest dimension. So, for an image with shape
         (480, 640, 3), run
-            * data = data.reshape(-1, 3)
+            `data = data.reshape(-1, data.shape[-1])`
         and pass this data into the constructor.
 
         Features
