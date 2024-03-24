@@ -437,16 +437,14 @@ class DataProcessor:
         """
         
         BAD_RETURN = None
-
         normalized_bbox_coordinates, Z_c = uav_data
-        Z_c = Z_c.astype(np.float32)
         # check z value
         if np.isnan(Z_c) or Z_c >= self.MAX_DEPTH_VAL or Z_c == np.inf:
             rospy.logwarn(f'{self.name}: Invalid Z value {Z_c}. Max Depth is {self.MAX_DEPTH_VAL/1000}m')
             return BAD_RETURN
         else:
             # convert to meters
-            Z_c /= 1000
+            Z_c = Z_c.astype(np.float32) / 1000
             rospy.loginfo(f'{self.name}: Z_val (m): {Z_c}')
             self.depth_pub.publish(Float32(Z_c))
  
