@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>rosnp_msgs</name>
-  <version>1.2.0</version>
+  <version>1.4.0</version>
   <description>
 	  The rosnp_msgs package. A rewrite of the numpy_msgs package to include
 	  multiple message types for bandwidth efficiency. 
