@@ -1,6 +1,5 @@
 test_mode: False 
 detect_thresh: 7
-depth_img_count: 3
 fps: 24  # ss01 Pub Rate
 follow_distance: 0.3 # meters
 yolo: {
@@ -9,16 +8,14 @@ yolo: {
         "conf": 0.35
     }
 topics:
-    img_topic: "RGBHub"
+    img_topic: "RGBDHub"
     detections: "detections"
     resume_trigger: "resume_trigger"
     depth_raw: "/camera/depth/image_raw"
-    depth_req: "depth_req"
     bad_detections: "bad_detections"
     tf2: "tf2_poll"
     tf2_record: "tf2_record"
     last_frame: "last_frame"
-    avg_depth_img: "avgd_depth_img"
     depth_val: "calcd_depth_val"
     calcd_drone_pos: "calcd_drone_pos" 
 
@@ -29,7 +26,7 @@ frame_data:
 ss00_Liaison:
     depth_topic: "/camera/depth/image_raw"
     waypoints: "waypoints"
-    move_base_result: "simulate_move_base_result"
+    move_base_result: "simulate_move_base_result" # A testing default
 
 ss02_Detector:
 # Define the private parameters for ss02.
