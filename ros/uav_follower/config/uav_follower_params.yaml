@@ -1,0 +1,50 @@
+test_mode: False 
+detect_thresh: 7
+depth_img_count: 3
+fps: 24  # ss01 Pub Rate
+follow_distance: 0.3 # meters
+yolo: {
+        "yolo": "/home/hiwonder/yolov5",
+        "weights": "/home/hiwonder/yolov5/weights/20231101_drone_weights.pt",
+        "conf": 0.50
+    }
+topics:
+    img_topic: "RGBHub"
+    detections: "detections"
+    resume_trigger: "resume_trigger"
+    depth_raw: "/camera/depth/image_raw"
+    depth_req: "depth_req"
+    bad_detections: "bad_detections"
+    tf2: "tf2_poll"
+    tf2_record: "tf2_record"
+    last_frame: "last_frame"
+    avg_depth_img: "avgd_depth_img"
+    depth_val: "calcd_depth_val"
+    calcd_drone_pos: "calcd_drone_pos" 
+
+frame_data:
+    HEIGHT: 480
+    WIDTH: 640
+
+ss00_Liaison:
+    depth_topic: "/camera/depth/image_raw"
+    waypoints: "waypoints"
+
+ss02_Detector:
+# Define the private parameters for ss02.
+    seek_thresh: 7.  # seconds
+
+ss03_DataProcessor:
+    density_thresh: 1.5
+    max_accel: 5
+    focal_length: 359.0439147949219
+    principal_point:
+    # [cx, cy]
+        - 321.4884338378906
+        - 181.9486541748047
+    # Set defaults for private topic names (to be overwritten by the launch file entries)
+    # I set these here so that there are no issues when testing.
+    waypoints: "waypoints"
+    frame_id: "map_frame"
+    max_depth: 1100  #mm
+

@@ -2,48 +2,14 @@
 """
 @author: Terrance Williams
 @date: 23 October 2023
-@last_edited: 19 February 2024
+@last_edited: 22 March 2024
 @description: Revised helper functions for the construction and deconstruction
 of ROSNumpy-type messages.
 """
 
 from typing import List
 import numpy as np
-from rosnp_msgs.msg import (
-        ROSNumpy_Int8, ROSNumpy_Int16, ROSNumpy_Int32, ROSNumpy_Int64,
-        ROSNumpy_UInt8, ROSNumpy_UInt16, ROSNumpy_UInt32, ROSNumpy_UInt64,
-        ROSNumpy_Float32, ROSNumpy_Float64, ROSNumpyList_Int8,
-        ROSNumpyList_Int16, ROSNumpyList_Int32, ROSNumpyList_Int64,
-        ROSNumpyList_UInt8, ROSNumpyList_UInt16, ROSNumpyList_UInt32,
-        ROSNumpyList_UInt64, ROSNumpyList_Float32, ROSNumpyList_Float64
-)
-
-
-rosnp_dict = {
-    'int8': ROSNumpy_Int8,
-    'int16': ROSNumpy_Int16,
-    'int32': ROSNumpy_Int32,
-    'int64': ROSNumpy_Int64,
-    'uint8': ROSNumpy_UInt8,
-    'uint16': ROSNumpy_UInt16,
-    'uint32': ROSNumpy_UInt32,
-    'uint64': ROSNumpy_UInt64,
-    'float32': ROSNumpy_Float32,
-    'float64': ROSNumpy_Float64
-}
-
-rosnp_list_dict = {
-    ROSNumpy_Int8: ROSNumpyList_Int8,
-    ROSNumpy_Int16: ROSNumpyList_Int16,
-    ROSNumpy_Int32: ROSNumpyList_Int32,
-    ROSNumpy_Int64: ROSNumpyList_Int64,
-    ROSNumpy_UInt8: ROSNumpyList_UInt8,
-    ROSNumpy_UInt16: ROSNumpyList_UInt16,
-    ROSNumpy_UInt32: ROSNumpyList_UInt32,
-    ROSNumpy_UInt64: ROSNumpyList_UInt64,
-    ROSNumpy_Float32: ROSNumpyList_Float32,
-    ROSNumpy_Float64: ROSNumpyList_Float64
-}
+from rosnp_msgs.msg import ROSNumpy, ROSNumpyList
 
 
 def encode_rosnp(array: np.ndarray):
@@ -66,27 +32,13 @@ def encode_rosnp(array: np.ndarray):
     
     shape = array.shape
     dtype = array.dtype.name
-    rosnp = array.flatten()
-    # correct ROS' uint8[] -> bytes serialization 
-    # All other numeric-typed arrays
-    # are serialized as tuples.
-    if dtype == 'uint8':
-        rosnp = rosnp.tobytes()
+    # ROS' uint8[] -> bytes serialization 
+    rosnp = array.tobytes()
     
     # Select the message class and instantiate an object.
-    try:
-        msg = rosnp_dict[dtype]()
-    except KeyError:
-        print(
-            f"<{func_name}> Input dtype {dtype} "
-            "is not among accepted formats. Use one of the following:"
-        )
-        for key in rosnp_dict:
-            print(key)
-        raise
-    else:
-        msg.shape, msg.dtype, msg.rosnp = shape, dtype, rosnp
-        return msg    
+    msg = ROSNumpy()
+    msg.shape, msg.dtype, msg.rosnp = shape, dtype, rosnp
+    return msg    
 
 
 def encode_rosnp_list(array_list: List[np.ndarray]):
@@ -115,24 +67,9 @@ def encode_rosnp_list(array_list: List[np.ndarray]):
     
     # Create list of msgs
     msg_arr = [encode_rosnp(arr) for arr in array_list]
-
-    # Determine message to use
-    msg_type = type(msg_arr[0])
-    try:
-        # Select the correct message and instantiate it.
-        msg = rosnp_list_dict[msg_type]()
-    except KeyError:
-        print(
-            f"<{func_name}> "
-            f"Message type {msg_type} not among supported types.\n"
-            "Supported Types:"
-        )
-        for key in rosnp_list_dict:
-            print(key)
-        raise
-    else:
-        msg.rosnp_list = msg_arr
-        return msg
+    msg = ROSNumpyList()
+    msg.rosnp_list = msg_arr
+    return msg
     
     
 def decode_rosnp(msg):
@@ -148,24 +85,8 @@ def decode_rosnp(msg):
         The corresponding array from the decoded message.
     """
     func_name = "rosnp_helpers.decode_rosnp"
-
-    # print(type(msg.rosnp), msg.rosnp)
-    msg_types = list(rosnp_dict.values())
-    if type(msg) not in msg_types:
-        print(
-            f"<{func_name}> Message type {type(msg)} not"
-            "among supported types.\nSupported types:"
-        )
-        for msg_type in msg_types:
-            print(msg_type)
-        raise TypeError   
-    
     shape, dtype, data = msg.shape, msg.dtype, msg.rosnp
-    if dtype == 'uint8':
-        result_array = np.ndarray(shape, dtype=dtype, buffer=data)
-    else:
-        result_array = np.array(data, dtype=dtype).reshape(shape)
-    
+    result_array = np.ndarray(shape, dtype=dtype, buffer=data)
     return result_array
 
 
@@ -182,17 +103,6 @@ def decode_rosnp_list(msg):
         The corresponding list of Numpy arrays from the decoded message.
     """
     func_name = "rosnp_helpers.decode_rosnp_list"
-    msg_types = list(rosnp_list_dict.values())
-
-    if type(msg) not in msg_types:
-        print(
-            f"<{func_name}> Message type {type(msg)} not"
-            "among supported types.\nSupported types:"
-        )
-        for msg_type in msg_types:
-            print(msg_type)
-        raise TypeError
-
     result_list = [decode_rosnp(message) for message in msg.rosnp_list]
     return result_list
 

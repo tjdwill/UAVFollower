@@ -1,0 +1,22 @@
+test_mode: False  # toggle test mode
+depth_img_count: 7  # Number of depth images to collect.
+fps: 24  # ss01 Pub Rate
+follow_distance: 0.2 # meters
+
+topics:
+    img_topic: "RGBHub"
+    depth_req: "depth_req"
+    detections: "detections"
+    resume_trigger: "resume_trigger"
+    bad_detections: "bad_detections"
+    tf2: "tf2_poll"
+    last_frame: "last_frame"
+    avg_depth: "avg_depth"
+
+frame_data:
+    HEIGHT: 480
+    WIDTH: 640
+
+depth_server:
+    depth_topic: "/camera/depth/image_raw"
+    move_base_result: "phony"

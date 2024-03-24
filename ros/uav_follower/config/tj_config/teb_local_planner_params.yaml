@@ -1,0 +1,83 @@
+# local planner
+TebLocalPlannerROS:
+  odom_topic: "odom" # Topic name for odometry messages, provided by the robot driver or emulator.
+  map_frame: "odom" # Global planning framework (if it is a static map, this parameter usually must be changed to "/map"
+
+  # Trajectory trajectory configuration parameters
+  teb_autosize: True
+  dt_ref: 0.45 # Desired trajectory time resolution (the trajectory is not fixed to dt_ref, as the time resolution is part of the optimization, but if dt_ref +-dt_hysteresis is violated, the trajectory will resize between iterations.
+  dt_hysteresis: 0.1 # Hysteresis that automatically resizes based on the current time resolution, typically approx. It is recommended to use 10% of dt_ref
+  global_plan_viapoint_sep: 0.2
+  global_plan_overwrite_orientation: True # Override the orientation of local subgoals provided by the global planner (since they usually only provide 2D paths)
+  max_global_plan_lookahead_dist: 1.5 # Specify the maximum length (cumulative Euclidean distance) of the subset of global plans taken into account for optimization. The actual length is determined by a logical combination of the local cost map size and this maximum bound. Set to zero or a negative number to deactivate this limit.
+  feasibility_check_no_poses: 3 # Specify which pose on the prediction plan should be checked for feasibility at each sampling interval.
+
+  publish_feedback: true
+
+  # Robot robot configuration parameters
+  max_vel_x: 0.09 # Maximum speed in X direction
+  max_vel_y: 0.0 #16.25 # The differential wheel robot has no Y direction speed, take 0 ################################ ########################
+  max_vel_x_backwards: 0.0 #0.06 # Maximum absolute translation speed of the robot when traveling backwards (in meters/second)
+  max_vel_theta: 0.25 # Maximum allowed rotation speed, in radians/second
+  acc_lim_x: 0.09 # Maximum linear acceleration in X direction
+  acc_lim_y: 0.0 #0.15 # The differential wheel robot has no linear acceleration in the Y direction, take 0 ############################### #####################
+  acc_lim_theta: 0.25 # Maximum angular acceleration
+  min_turning_radius: 0.0 #0.05 # Minimum turning radius of car-like robots (differential drive robots are set to zero
+  # Specify the robot footprint model type used for optimization. The different types are "point", "circle", "line", "two_circles" and "polygon". The type of model significantly affects the required computational time
+  footprint_model: # types: "point", "circular", "two_circles", "line", "polygon"
+    types: "point"
+    #radius: 0.28 # for type "circular"
+    #vertices: [[-0.17, -0.14], [-0.17, 0.14],[0.17, 0.14], [0.17, -0.14]]
+
+  # GoalTolerance target tolerance parameter
+  xy_goal_tolerance: 0.1 # Allowed final Euclidean distance to goal location in meters
+  yaw_goal_tolerance: 0.2 # Allowed final direction error (in radians)
+  free_goal_vel: false #Remove the target speed constraint so that the robot can reach the target at the maximum speed
+
+  # Obstacles obstacle parameters
+  min_obstacle_dist: 0.38 # Minimum expected distance between base_footprint and obstacles during local planning (in meters)
+  inflation_dist: 0.0
+  include_costmap_obstacles: True # Specifies whether local costmap obstacles should be considered. Each cell marked as an obstacle is considered a point obstacle. Therefore, do not choose a very small cost map resolution as it will increase the calculation time
+  costmap_obstacles_behind_robot_dist: 1.0 # Limit the occupancy of local cost map obstacles considered when planning behind the robot (specify distance in meters)
+  obstacle_poses_affected: 15 # Each obstacle position is appended to the closest pose on the trajectory to maintain distance. Also consider other neighbors
+  costmap_converter_plugin: "costmap_converter::CostmapToLinesDBSRANSAC" # Define the plugin name to convert costmap cells to points/lines/polygons. Set an empty string to disable the conversion so that all cells are treated as point barriers.
+  #Possible values are "costmap_converter::CostmapToPolygonsDBSMCCH", "costmap_converter::CostmapToLinesDBSRANSAC", "costmap_converter::CostmapToLinesDBSMCCH", "costmap_converter::CostmapToPolygonsDBSConcaveHull", "" # An empty string means not enabled
+  costmap_converter_spin_thread: True # If set to true, the costmap converter calls its callback queue in a different thread.
+  costmap_converter_rate: 5 # Rate, defines how often the costmap_converter plugin processes the current cost map (this value should not be higher than the cost map update rate) [in Hertz]
+
+  # Optimization optimization parameters
+  no_inner_iterations: 5 # Actual number of solver iterations called in each outer loop iteration
+  no_outer_iterations: 4 # Each outer loop iteration will automatically adjust the size of the trajectory according to the required time resolution dt_ref and call the internal optimizer (execute no_inner_iterations). Therefore, the total number of solver iterations per planning cycle is the product of the two values
+  optimization_activate: True
+  optimization_verbose: False
+  penalty_epsilon: 0.05 # Add a small safety margin to the penalty function of the hard constraint approximation
+  weight_max_vel_x: 1 # Optimization weight that meets the maximum allowed translation speed
+  #weight_max_vel_y: 1 #Differential navigation comment out this line##################################### ##########
+  weight_max_vel_theta: 1
+  weight_acc_lim_x: 1
+  #weight_acc_lim_y: 1 #Differential navigation comment out this line##################################### ##########
+  weight_acc_lim_theta: 1
+  weight_kinematics_nh: 1000 # Optimization weights that satisfy non-holonomic kinematics (this parameter must be high because the kinematic equations constitute equality constraints, even a value of 1000 does not mean due to a small "original" cost value compared to other costs Poor matrix condition)
+  weight_kinematics_forward_drive: 100000000 # Force the robot to only select optimized weights in the forward direction (positive translation speed). A smaller weight (e.g. 1.0) still allows rearward travel. A value around 1000 almost prevents driving backwards (but is not guaranteed).
+  weight_kinematics_turning_radius: 1 # Perform the optimization weight of the minimum turning radius (only applicable to car-like robots).
+  weight_optimaltime: 1 # Optimization weight for shrinking trajectory wrt transformation/execution time
+  weight_obstacle: 50 # Optimization weight to maintain minimum distance from obstacles
+  weight_inflation: 0.2
+  weight_dynamic_obstacle: 10 # not in use yet
+  weight_dynamic_obstacle_inflation: 0.2
+  weight_viapoint: 1
+  weight_adapt_factor: 2
+  selection_alternative_time_cost: False # If true, the time cost (sum of squared time differences) will be replaced by the total conversion time (sum of time differences).
+
+  #HomotopyClassPlanner
+  enable_homotopy_class_planning: False # Activate parallel planning (requires more CPU resources because multiple trajectories are optimized simultaneously)
+  enable_multithreading: True # Activate multithreading to plan each trajectory in a different thread
+  simple_exploration: False
+  max_number_classes: 4 # Specify the maximum number of different trajectories considered (limits the amount of calculation)
+  roadmap_graph_no_samples: 15 # Specify the number of samples generated to create a roadmap
+  roadmap_graph_area_width: 5 # Sample random keypoints/waypoints in the rectangular area between the start and target. Specifies the width of the area in meters.
+  h_signature_prescaler: 0.5 # Scale used to distinguish internal parameters of homotopy classes (H-signature). Warning: Only reduce this parameter if you observe issues with too many obstacles in the local cost map, do not choose very low otherwise obstacles will not be distinguished (0.2< value <=1).
+  h_signature_threshold: 0.1 # If the difference between the real and complex parts is below the specified threshold, the two H signatures are assumed to be equal
+  obstacle_keypoint_offset: 0.1
+  obstacle_heading_threshold: 0.45
+  visualize_hc_graph: False # Visualize the graph created to explore unique trajectories (check the marker message in rviz)
