@@ -1,1 +1,0 @@
-rosnp_msgs/ROSNumpy_Int32[] rosnp_list
