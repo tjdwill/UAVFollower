@@ -436,7 +436,7 @@ class DataProcessor:
             3. Create and return PointStamped message of the waypoint
         """
         
-        BAD_RETURN = None
+        BAD_RETURN = None  # If you change this, change the check value after the function callsite
         normalized_bbox_coordinates, Z_c = uav_data
         # check z value
         if np.isnan(Z_c) or Z_c >= self.MAX_DEPTH_VAL or Z_c == np.inf:
