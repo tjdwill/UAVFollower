@@ -121,8 +121,6 @@ class Photographer:
         self.release_resources()
 
 
-
-
 if __name__ == '__main__':
     try:
         with Photographer() as ss01:
