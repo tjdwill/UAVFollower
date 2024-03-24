@@ -1,5 +1,5 @@
 test_mode: False 
-detect_thresh: 7
+detect_thresh: 5
 fps: 24  # ss01 Pub Rate
 follow_distance: 0.3 # meters
 yolo: {
