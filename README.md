@@ -1,4 +1,4 @@
-# UAV Detector
+# UAV Follower
 
 Title: *Leader-Follower-Based Collaborative Navigation of a UGV-UAV Formation*
 
